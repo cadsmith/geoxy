@@ -1,0 +1,9 @@
+target_sources(geoxy
+  PRIVATE
+    choose.cpp
+    circle.cpp
+    guide.cpp
+    rework.cpp
+    smooth.cpp
+    surd.cpp
+)

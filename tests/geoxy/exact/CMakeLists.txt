@@ -1,0 +1,10 @@
+target_sources(geoxy_tests
+  PRIVATE
+    batch.cpp
+    circle.cpp
+    fuzz.cpp
+    grid.cpp
+    orient.cpp
+    two.cpp
+    whole.cpp
+)

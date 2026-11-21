@@ -1,0 +1,19 @@
+target_sources(geoxy
+  PRIVATE
+    bernstein.cpp
+    braid.cpp
+    bulge.cpp
+    circuit.cpp
+    gather.cpp
+    lace.cpp
+    met.cpp
+    oval.cpp
+    piece.cpp
+    pieced.cpp
+    rim.cpp
+    ring.cpp
+    section.cpp
+    strand.cpp
+    twin.cpp
+    vault.cpp
+)

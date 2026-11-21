@@ -1,0 +1,13 @@
+{
+  "[cpp]": {
+    "editor.formatOnSave": false
+  },
+  "emeraldwalk.runonsave": {
+    "commands": [
+      {
+        "match": "\\.(cpp|hpp)$",
+        "cmd": "python3 -I \"${workspaceFolder}/tools/format/style.py\" \"${file}\""
+      }
+    ]
+  }
+}

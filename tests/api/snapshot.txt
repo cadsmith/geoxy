@@ -1,0 +1,2083 @@
+== geoxy/accuracy.hpp
+namespace Geoxy
+{
+  struct Accuracy
+  {
+    double Error = 0.0; 
+  };
+}
+== geoxy/angle.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/vector.hpp"
+#include <compare>
+#include <functional>
+#include <numbers>
+namespace Geoxy
+{
+  inline constexpr double Pi = std::numbers::pi;
+  class Angle
+  {
+  public:
+    constexpr Angle() = default;
+    [[nodiscard]] constexpr auto InRadians() const -> double
+    {
+      return m_InDegrees ? Converted(m_Value, true) : m_Value;
+    }
+    [[nodiscard]] constexpr auto InDegrees() const -> double
+    {
+      return m_InDegrees ? m_Value : Converted(m_Value, false);
+    }
+    [[nodiscard]] constexpr auto HeldInDegrees() const -> bool { return m_InDegrees; }
+    [[nodiscard]] friend constexpr auto operator==(const Angle &lhs, const Angle &rhs) -> bool
+    {
+      if (lhs.m_InDegrees == rhs.m_InDegrees)
+      {
+        return std::equal_to<double>{}(lhs.m_Value, rhs.m_Value);
+      }
+      return std::equal_to<double>{}(lhs.InDegrees(), rhs.InDegrees());
+    }
+    [[nodiscard]] friend constexpr auto operator<=>(const Angle &lhs, const Angle &rhs)
+        -> std::partial_ordering
+    {
+      if (lhs.m_InDegrees == rhs.m_InDegrees)
+      {
+        return lhs.m_Value <=> rhs.m_Value;
+      }
+      return lhs.InDegrees() <=> rhs.InDegrees();
+    }
+    friend constexpr auto Radians(double radians) -> Angle;
+    friend constexpr auto Degrees(double degrees) -> Angle;
+  private:
+    constexpr Angle(double value, bool inDegrees) : m_Value(value), m_InDegrees(inDegrees) {}
+    [[nodiscard]] GEOXY_API static auto Converted(double value, bool toRadians) -> double;
+    double m_Value     = 0.0;   
+    bool   m_InDegrees = false; 
+  };
+  [[nodiscard]] constexpr auto Radians(double radians) -> Angle
+  {
+    return {radians, false};
+  }
+  [[nodiscard]] constexpr auto Degrees(double degrees) -> Angle
+  {
+    return {degrees, true};
+  }
+  inline constexpr Angle Turn = Degrees(360.0);
+  [[nodiscard]] constexpr auto operator+(Angle lhs, Angle rhs) -> Angle
+  {
+    if (lhs.HeldInDegrees() || rhs.HeldInDegrees())
+    {
+      return Degrees(lhs.InDegrees() + rhs.InDegrees());
+    }
+    return Radians(lhs.InRadians() + rhs.InRadians());
+  }
+  [[nodiscard]] constexpr auto operator-(Angle lhs, Angle rhs) -> Angle
+  {
+    if (lhs.HeldInDegrees() || rhs.HeldInDegrees())
+    {
+      return Degrees(lhs.InDegrees() - rhs.InDegrees());
+    }
+    return Radians(lhs.InRadians() - rhs.InRadians());
+  }
+  [[nodiscard]] constexpr auto operator-(Angle angle) -> Angle
+  {
+    return angle.HeldInDegrees() ? Degrees(-angle.InDegrees()) : Radians(-angle.InRadians());
+  }
+  [[nodiscard]] constexpr auto operator*(Angle lhs, double rhs) -> Angle
+  {
+    return lhs.HeldInDegrees() ? Degrees(lhs.InDegrees() * rhs) : Radians(lhs.InRadians() * rhs);
+  }
+  [[nodiscard]] constexpr auto operator/(Angle lhs, double rhs) -> Angle
+  {
+    return lhs.HeldInDegrees() ? Degrees(lhs.InDegrees() / rhs) : Radians(lhs.InRadians() / rhs);
+  }
+  [[nodiscard]] GEOXY_API auto Wrapped(Angle angle) -> Angle;
+  [[nodiscard]] GEOXY_API auto Within(Angle direction, Angle start, Angle sweep) -> bool;
+  [[nodiscard]] GEOXY_API auto Direction(Angle angle) -> Vector;
+  [[nodiscard]] GEOXY_API auto Direction(Angle start, Angle sweep, double along) -> Vector;
+  [[nodiscard]] GEOXY_API auto Heading(Vector vector) -> Angle;
+  [[nodiscard]] GEOXY_API auto Between(Vector start, Vector end) -> Angle;
+  [[nodiscard]] GEOXY_API auto Order(Vector lhs, Vector rhs) -> std::strong_ordering;
+}
+== geoxy/api.hpp
+#ifdef GEOXY_STATIC
+#  define GEOXY_API
+#else
+#  if defined(_WIN32) || defined(__CYGWIN__)
+#    ifdef geoxy_EXPORTS
+#      define GEOXY_API __declspec(dllexport)
+#    else
+#      define GEOXY_API __declspec(dllimport)
+#    endif
+#  else
+#    if defined(__GNUC__) && __GNUC__ >= 4
+#      define GEOXY_API __attribute__((visibility("default")))
+#    else
+#      define GEOXY_API
+#    endif
+#  endif
+#endif
+== geoxy/arc.hpp
+#include "geoxy/angle.hpp"
+#include "geoxy/api.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/vector.hpp"
+#include <functional>
+#include <optional>
+namespace Geoxy
+{
+  struct Arc
+  {
+    Point  Center = {};  
+    double Radius = 0.0; 
+    Angle  Start  = {};  
+    Angle  Sweep  = {};  
+    [[nodiscard]] GEOXY_API static auto Through(Point start, Point through, Point end)
+        -> std::optional<Arc>;
+    [[nodiscard]] GEOXY_API static auto Around(Point start, Point center, Point end)
+        -> std::optional<Arc>;
+    [[nodiscard]] GEOXY_API static auto Spanning(Point start, Point end, double radius)
+        -> std::optional<Arc>;
+    [[nodiscard]] GEOXY_API static auto Leaving(Point start, Point end, Vector way)
+        -> std::optional<Arc>;
+    [[nodiscard]] friend constexpr auto operator==(const Arc &lhs, const Arc &rhs) -> bool
+    {
+      return lhs.Center == rhs.Center
+          && std::equal_to<double>{}(lhs.Radius, rhs.Radius)
+          && lhs.Start == rhs.Start
+          && lhs.Sweep == rhs.Sweep;
+    }
+  };
+  [[nodiscard]] constexpr auto Circle(Point center, double radius) -> Arc
+  {
+    return {.Center = center, .Radius = radius, .Start = {}, .Sweep = Turn};
+  }
+}
+== geoxy/area.hpp
+#include "geoxy/accuracy.hpp"
+#include "geoxy/api.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/bezier/cubic.hpp"
+#include "geoxy/bezier/quadratic.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/ellipse.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/ray.hpp"
+#include "geoxy/spline.hpp"
+#include "geoxy/xline.hpp"
+#include <optional>
+namespace Geoxy
+{
+  [[nodiscard]] GEOXY_API auto Area(const Line &line) -> double;
+  [[nodiscard]] GEOXY_API auto Area(const Ray &ray) -> double;
+  [[nodiscard]] GEOXY_API auto Area(const Xline &xline) -> double;
+  [[nodiscard]] GEOXY_API auto Area(const Arc &arc) -> double;
+  [[nodiscard]] GEOXY_API auto Area(const Ellipse &ellipse) -> double;
+  [[nodiscard]] GEOXY_API auto Area(const Polyline &polyline) -> double;
+  [[nodiscard]] GEOXY_API auto Area(const Spline &spline, Accuracy accuracy) -> double;
+  [[nodiscard]] GEOXY_API auto Area(const Bezier::Quadratic &quadratic) -> double;
+  [[nodiscard]] GEOXY_API auto Area(const Bezier::Cubic &cubic) -> double;
+  [[nodiscard]] GEOXY_API auto Area(const Curve &curve, Accuracy accuracy) -> double;
+  [[nodiscard]] GEOXY_API auto Centroid(const Line &line) -> std::optional<Point>;
+  [[nodiscard]] GEOXY_API auto Centroid(const Ray &ray) -> std::optional<Point>;
+  [[nodiscard]] GEOXY_API auto Centroid(const Xline &xline) -> std::optional<Point>;
+  [[nodiscard]] GEOXY_API auto Centroid(const Arc &arc) -> std::optional<Point>;
+  [[nodiscard]] GEOXY_API auto Centroid(const Ellipse &ellipse) -> std::optional<Point>;
+  [[nodiscard]] GEOXY_API auto Centroid(const Polyline &polyline) -> std::optional<Point>;
+  [[nodiscard]] GEOXY_API auto Centroid(const Spline &spline, Accuracy accuracy)
+      -> std::optional<Point>;
+  [[nodiscard]] GEOXY_API auto Centroid(const Bezier::Quadratic &quadratic) -> std::optional<Point>;
+  [[nodiscard]] GEOXY_API auto Centroid(const Bezier::Cubic &cubic) -> std::optional<Point>;
+  [[nodiscard]] GEOXY_API auto Centroid(const Curve &curve, Accuracy accuracy)
+      -> std::optional<Point>;
+}
+== geoxy/arrangement.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/error.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/region.hpp"
+#include "geoxy/tolerance.hpp"
+#include <expected>
+#include <memory>
+#include <span>
+namespace Geoxy
+{
+  struct Arranged;
+  struct Closing
+  {
+    Tolerance Within = {};  
+    double    Gap    = 0.0; 
+  };
+  class Arrangement
+  {
+  public:
+    GEOXY_API Arrangement(std::span<const Curve> curves, const Closing &closing);
+  private:
+    friend struct Arranging;
+    std::shared_ptr<const Arranged> m_Faces = {}; 
+  };
+  [[nodiscard]] GEOXY_API auto Boundary(const Arrangement &arrangement, Point point)
+      -> std::expected<Region, Error>;
+}
+== geoxy/at.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/bezier/cubic.hpp"
+#include "geoxy/bezier/quadratic.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/ellipse.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/ray.hpp"
+#include "geoxy/spline.hpp"
+#include "geoxy/xline.hpp"
+namespace Geoxy
+{
+  [[nodiscard]] GEOXY_API auto At(const Line &line, double along) -> Point;
+  [[nodiscard]] GEOXY_API auto At(const Ray &ray, double along) -> Point;
+  [[nodiscard]] GEOXY_API auto At(const Xline &xline, double along) -> Point;
+  [[nodiscard]] GEOXY_API auto At(const Arc &arc, double along) -> Point;
+  [[nodiscard]] GEOXY_API auto At(const Ellipse &ellipse, double along) -> Point;
+  [[nodiscard]] GEOXY_API auto At(const Polyline &polyline, double along) -> Point;
+  [[nodiscard]] GEOXY_API auto At(const Spline &spline, double along) -> Point;
+  [[nodiscard]] GEOXY_API auto At(const Bezier::Quadratic &quadratic, double along) -> Point;
+  [[nodiscard]] GEOXY_API auto At(const Bezier::Cubic &cubic, double along) -> Point;
+  [[nodiscard]] GEOXY_API auto At(const Curve &curve, double along) -> Point;
+}
+== geoxy/bezier/cubic.hpp
+#include "geoxy/point.hpp"
+namespace Geoxy::Bezier
+{
+  struct Cubic
+  {
+    Point Start = {}; 
+    Point Out   = {}; 
+    Point In    = {}; 
+    Point End   = {}; 
+    [[nodiscard]] friend constexpr auto operator==(const Cubic &lhs, const Cubic &rhs) -> bool
+    {
+      return lhs.Start == rhs.Start && lhs.Out == rhs.Out && lhs.In == rhs.In && lhs.End == rhs.End;
+    }
+  };
+}
+== geoxy/bezier/quadratic.hpp
+#include "geoxy/point.hpp"
+namespace Geoxy::Bezier
+{
+  struct Quadratic
+  {
+    Point Start   = {}; 
+    Point Control = {}; 
+    Point End     = {}; 
+    [[nodiscard]] friend constexpr auto operator==(const Quadratic &lhs, const Quadratic &rhs)
+        -> bool
+    {
+      return lhs.Start == rhs.Start && lhs.Control == rhs.Control && lhs.End == rhs.End;
+    }
+  };
+}
+== geoxy/box.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/vector.hpp"
+#include <algorithm>
+#include <limits>
+namespace Geoxy
+{
+  struct Box
+  {
+    Point Min = {.X = std::numeric_limits<double>::infinity(),
+                 .Y = std::numeric_limits<double>::infinity()};
+    Point Max = {.X = -std::numeric_limits<double>::infinity(),
+                 .Y = -std::numeric_limits<double>::infinity()};
+    [[nodiscard]] friend constexpr auto operator==(const Box &lhs, const Box &rhs) -> bool
+    {
+      return lhs.Min == rhs.Min && lhs.Max == rhs.Max;
+    }
+  };
+  [[nodiscard]] constexpr auto IsEmpty(const Box &box) -> bool
+  {
+    return !(box.Min.X <= box.Max.X) || !(box.Min.Y <= box.Max.Y);
+  }
+  [[nodiscard]] constexpr auto Grown(const Box &box, Point point) -> Box
+  {
+    return {.Min = {.X = std::min(box.Min.X, point.X), .Y = std::min(box.Min.Y, point.Y)},
+            .Max = {.X = std::max(box.Max.X, point.X), .Y = std::max(box.Max.Y, point.Y)}};
+  }
+  [[nodiscard]] constexpr auto Joined(const Box &first, const Box &second) -> Box
+  {
+    const Point least = {.X = std::min(first.Min.X, second.Min.X),
+                         .Y = std::min(first.Min.Y, second.Min.Y)};
+    const Point most  = {.X = std::max(first.Max.X, second.Max.X),
+                         .Y = std::max(first.Max.Y, second.Max.Y)};
+    return {.Min = least, .Max = most};
+  }
+  [[nodiscard]] constexpr auto Contains(const Box &box, Point point) -> bool
+  {
+    return box.Min.X <= point.X
+        && point.X   <= box.Max.X
+        && box.Min.Y <= point.Y
+        && point.Y   <= box.Max.Y;
+  }
+  [[nodiscard]] constexpr auto Overlaps(const Box &first, const Box &second) -> bool
+  {
+    return first.Min.X  <= second.Max.X
+        && second.Min.X <= first.Max.X
+        && first.Min.Y  <= second.Max.Y
+        && second.Min.Y <= first.Max.Y;
+  }
+  [[nodiscard]] constexpr auto Size(const Box &box) -> Vector
+  {
+    return box.Max - box.Min;
+  }
+  [[nodiscard]] GEOXY_API auto Center(const Box &box) -> Point;
+  [[nodiscard]] GEOXY_API auto Padded(const Box &box, double margin) -> Box;
+}
+== geoxy/chamfer.hpp
+#include "geoxy/angle.hpp"
+#include "geoxy/api.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/fillet.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/tolerance.hpp"
+#include <array>
+#include <expected>
+#include <optional>
+namespace Geoxy
+{
+  struct Bevel
+  {
+    double               First  = 0.0; 
+    double               Second = 0.0; 
+    std::optional<Angle> Slant  = {};  
+  };
+  struct Chamfering
+  {
+    Bevel                Cut   = {}; 
+    std::array<Point, 2> Picks = {}; 
+  };
+  struct Bevelled
+  {
+    Curve               First  = {}; 
+    Curve               Second = {}; 
+    std::optional<Line> Edge   = {}; 
+  };
+  [[nodiscard]] GEOXY_API auto Chamfer(const Curve &first, const Curve &second,
+                                       const Chamfering &chamfering)
+      -> std::expected<Bevelled, Misfit>;
+  [[nodiscard]] GEOXY_API auto Chamfer(const Polyline &polyline, const Bevel &bevel,
+                                       const Tolerance &tolerance)
+      -> std::expected<Reshaped, Misfit>;
+}
+== geoxy/clip.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/bezier/cubic.hpp"
+#include "geoxy/bezier/quadratic.hpp"
+#include "geoxy/box.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/domain.hpp"
+#include "geoxy/ellipse.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/ray.hpp"
+#include "geoxy/spline.hpp"
+#include "geoxy/xline.hpp"
+#include <vector>
+namespace Geoxy
+{
+  [[nodiscard]] GEOXY_API auto Clip(const Line &line, const Box &box) -> std::vector<Range>;
+  [[nodiscard]] GEOXY_API auto Clip(const Ray &ray, const Box &box) -> std::vector<Range>;
+  [[nodiscard]] GEOXY_API auto Clip(const Xline &xline, const Box &box) -> std::vector<Range>;
+  [[nodiscard]] GEOXY_API auto Clip(const Arc &arc, const Box &box) -> std::vector<Range>;
+  [[nodiscard]] GEOXY_API auto Clip(const Ellipse &ellipse, const Box &box) -> std::vector<Range>;
+  [[nodiscard]] GEOXY_API auto Clip(const Polyline &polyline, const Box &box) -> std::vector<Range>;
+  [[nodiscard]] GEOXY_API auto Clip(const Spline &spline, const Box &box) -> std::vector<Range>;
+  [[nodiscard]] GEOXY_API auto Clip(const Bezier::Quadratic &quadratic, const Box &box)
+      -> std::vector<Range>;
+  [[nodiscard]] GEOXY_API auto Clip(const Bezier::Cubic &cubic, const Box &box)
+      -> std::vector<Range>;
+  [[nodiscard]] GEOXY_API auto Clip(const Curve &curve, const Box &box) -> std::vector<Range>;
+}
+== geoxy/cloud.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/box.hpp"
+#include "geoxy/point.hpp"
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <limits>
+#include <memory>
+#include <span>
+#include <vector>
+namespace Geoxy
+{
+  struct Boughs;
+  class Cloud
+  {
+  public:
+    struct Close
+    {
+      std::size_t Index    = 0;   
+      double      Distance = 0.0; 
+      [[nodiscard]] friend constexpr auto operator==(const Close &lhs, const Close &rhs) -> bool
+      {
+        return lhs.Index == rhs.Index && std::equal_to<double>{}(lhs.Distance, rhs.Distance);
+      }
+    };
+    static constexpr double Anywhere = std::numeric_limits<double>::infinity();
+    GEOXY_API Cloud();
+    GEOXY_API explicit Cloud(std::span<const Point> points);
+    GEOXY_API Cloud(const Cloud &other);
+    GEOXY_API Cloud(Cloud &&other) noexcept;
+    GEOXY_API auto operator=(const Cloud &other) -> Cloud &;
+    GEOXY_API auto operator=(Cloud &&other) noexcept -> Cloud &;
+    GEOXY_API ~Cloud();
+    [[nodiscard]] auto Size() const -> std::size_t { return m_Count; }
+    [[nodiscard]] auto Holds(std::size_t index) const -> bool
+    {
+      return index < m_Held.size() && m_Held[index] != 0;
+    }
+    [[nodiscard]] auto operator[](std::size_t index) const -> Point { return m_Points[index]; }
+    GEOXY_API auto Insert(Point point) -> std::size_t;
+    GEOXY_API void Erase(std::size_t index);
+    [[nodiscard]] GEOXY_API auto Within(const Box &box) const -> std::vector<std::size_t>;
+    [[nodiscard]] GEOXY_API auto Nearest(Point point, std::size_t count, double within) const
+        -> std::vector<Close>;
+  private:
+    std::vector<Point>        m_Points = {}; 
+    std::vector<std::uint8_t> m_Held   = {}; 
+    std::vector<std::size_t>  m_Spare  = {}; 
+    std::size_t               m_Count  = 0;  
+    std::unique_ptr<Boughs>   m_Boughs;      
+  };
+}
+== geoxy/construct.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/segment.hpp"
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <vector>
+namespace Geoxy
+{
+  enum class Qualifier : std::uint8_t
+  {
+    Left,      
+    Right,     
+    Outside,   
+    Enclosing, 
+    Enclosed,  
+  };
+  struct Grazing
+  {
+    Point     At   = {};                 
+    Qualifier Kind = Qualifier::Outside; 
+  };
+  template <std::size_t CountT>
+  struct Tangential
+  {
+    Arc                         Circle  = {}; 
+    std::array<Grazing, CountT> Touches = {}; 
+  };
+  [[nodiscard]] GEOXY_API auto Circle(Point first, Point second) -> Arc;
+  [[nodiscard]] GEOXY_API auto Circle(Point first, Point second, Point third) -> std::optional<Arc>;
+  [[nodiscard]] GEOXY_API auto TangentCircles(const Segment &first, const Segment &second,
+                                              double radius) -> std::vector<Tangential<2>>;
+  [[nodiscard]] GEOXY_API auto TangentCircles(const Segment &first, const Segment &second,
+                                              const Segment &third) -> std::vector<Tangential<3>>;
+  [[nodiscard]] GEOXY_API auto TangentLines(Point from, const Arc &circle) -> std::vector<Line>;
+  [[nodiscard]] GEOXY_API auto TangentLines(const Arc &first, const Arc &second)
+      -> std::vector<Line>;
+}
+== geoxy/contain.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/box.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/region.hpp"
+#include "geoxy/tolerance.hpp"
+namespace Geoxy
+{
+  [[nodiscard]] GEOXY_API auto Inside(const Curve &curve, const Box &box) -> bool;
+  [[nodiscard]] GEOXY_API auto Intersects(const Curve &curve, const Box &box) -> bool;
+  [[nodiscard]] GEOXY_API auto Inside(const Curve &curve, const Region &region,
+                                      const Tolerance &tolerance) -> bool;
+  [[nodiscard]] GEOXY_API auto Intersects(const Curve &curve, const Region &region,
+                                          const Tolerance &tolerance) -> bool;
+  [[nodiscard]] GEOXY_API auto Inside(const Curve &curve, const Polyline &polygon,
+                                      const Tolerance &tolerance) -> bool;
+  [[nodiscard]] GEOXY_API auto Intersects(const Curve &curve, const Polyline &polygon,
+                                          const Tolerance &tolerance) -> bool;
+}
+== geoxy/curvature.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/bezier/cubic.hpp"
+#include "geoxy/bezier/quadratic.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/ellipse.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/ray.hpp"
+#include "geoxy/spline.hpp"
+#include "geoxy/vector.hpp"
+#include "geoxy/xline.hpp"
+#include <optional>
+namespace Geoxy
+{
+  [[nodiscard]] GEOXY_API auto Tangent(const Line &line, double along) -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Tangent(const Ray &ray, double along) -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Tangent(const Xline &xline, double along) -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Tangent(const Arc &arc, double along) -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Tangent(const Ellipse &ellipse, double along)
+      -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Tangent(const Polyline &polyline, double along)
+      -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Tangent(const Spline &spline, double along) -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Tangent(const Bezier::Quadratic &quadratic, double along)
+      -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Tangent(const Bezier::Cubic &cubic, double along)
+      -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Tangent(const Curve &curve, double along) -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Normal(const Line &line, double along) -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Normal(const Ray &ray, double along) -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Normal(const Xline &xline, double along) -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Normal(const Arc &arc, double along) -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Normal(const Ellipse &ellipse, double along)
+      -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Normal(const Polyline &polyline, double along)
+      -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Normal(const Spline &spline, double along) -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Normal(const Bezier::Quadratic &quadratic, double along)
+      -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Normal(const Bezier::Cubic &cubic, double along)
+      -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Normal(const Curve &curve, double along) -> std::optional<Vector>;
+  [[nodiscard]] GEOXY_API auto Curvature(const Line &line, double along) -> std::optional<double>;
+  [[nodiscard]] GEOXY_API auto Curvature(const Ray &ray, double along) -> std::optional<double>;
+  [[nodiscard]] GEOXY_API auto Curvature(const Xline &xline, double along) -> std::optional<double>;
+  [[nodiscard]] GEOXY_API auto Curvature(const Arc &arc, double along) -> std::optional<double>;
+  [[nodiscard]] GEOXY_API auto Curvature(const Ellipse &ellipse, double along)
+      -> std::optional<double>;
+  [[nodiscard]] GEOXY_API auto Curvature(const Polyline &polyline, double along)
+      -> std::optional<double>;
+  [[nodiscard]] GEOXY_API auto Curvature(const Spline &spline, double along)
+      -> std::optional<double>;
+  [[nodiscard]] GEOXY_API auto Curvature(const Bezier::Quadratic &quadratic, double along)
+      -> std::optional<double>;
+  [[nodiscard]] GEOXY_API auto Curvature(const Bezier::Cubic &cubic, double along)
+      -> std::optional<double>;
+  [[nodiscard]] GEOXY_API auto Curvature(const Curve &curve, double along) -> std::optional<double>;
+}
+== geoxy/curve.hpp
+#include "geoxy/arc.hpp"
+#include "geoxy/bezier/cubic.hpp"
+#include "geoxy/bezier/quadratic.hpp"
+#include "geoxy/ellipse.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/ray.hpp"
+#include "geoxy/spline.hpp"
+#include "geoxy/xline.hpp"
+#include <variant>
+namespace Geoxy
+{
+  using Curve = std::variant<Line, Ray, Xline, Arc, Ellipse, Polyline, Spline, Bezier::Quadratic,
+                             Bezier::Cubic>;
+}
+== geoxy/dash.hpp
+#include "geoxy/accuracy.hpp"
+#include "geoxy/api.hpp"
+#include "geoxy/curve.hpp"
+#include <cstddef>
+#include <vector>
+namespace Geoxy
+{
+  inline constexpr std::size_t MostPatterns = 1'048'576;
+  struct Pattern
+  {
+    std::vector<double> Elements = {};   
+    double              Phase    = 0.0;  
+    bool                Across   = true; 
+  };
+  [[nodiscard]] GEOXY_API auto Dashes(const Curve &curve, const Pattern &pattern, Accuracy accuracy)
+      -> std::vector<Curve>;
+}
+== geoxy/derivative.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/bezier/cubic.hpp"
+#include "geoxy/bezier/quadratic.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/ellipse.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/ray.hpp"
+#include "geoxy/spline.hpp"
+#include "geoxy/vector.hpp"
+#include "geoxy/xline.hpp"
+namespace Geoxy
+{
+  [[nodiscard]] GEOXY_API auto Derivative(const Line &line, double along) -> Vector;
+  [[nodiscard]] GEOXY_API auto Derivative(const Ray &ray, double along) -> Vector;
+  [[nodiscard]] GEOXY_API auto Derivative(const Xline &xline, double along) -> Vector;
+  [[nodiscard]] GEOXY_API auto Derivative(const Arc &arc, double along) -> Vector;
+  [[nodiscard]] GEOXY_API auto Derivative(const Ellipse &ellipse, double along) -> Vector;
+  [[nodiscard]] GEOXY_API auto Derivative(const Polyline &polyline, double along) -> Vector;
+  [[nodiscard]] GEOXY_API auto Derivative(const Spline &spline, double along) -> Vector;
+  [[nodiscard]] GEOXY_API auto Derivative(const Bezier::Quadratic &quadratic, double along)
+      -> Vector;
+  [[nodiscard]] GEOXY_API auto Derivative(const Bezier::Cubic &cubic, double along) -> Vector;
+  [[nodiscard]] GEOXY_API auto Derivative(const Curve &curve, double along) -> Vector;
+}
+== geoxy/divide.hpp
+#include "geoxy/accuracy.hpp"
+#include "geoxy/api.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/place.hpp"
+#include <cstddef>
+#include <vector>
+namespace Geoxy
+{
+  inline constexpr std::size_t MostPlaces = 16'777'216;
+  [[nodiscard]] GEOXY_API auto Divide(const Curve &curve, std::size_t parts, Accuracy accuracy)
+      -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Measure(const Curve &curve, double length, Accuracy accuracy)
+      -> std::vector<Place>;
+}
+== geoxy/domain.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/bezier/cubic.hpp"
+#include "geoxy/bezier/quadratic.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/ellipse.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/ray.hpp"
+#include "geoxy/spline.hpp"
+#include "geoxy/xline.hpp"
+#include <functional>
+#include <limits>
+namespace Geoxy
+{
+  struct Range
+  {
+    double Start = 0.0; 
+    double End   = 0.0; 
+    [[nodiscard]] friend constexpr auto operator==(const Range &lhs, const Range &rhs) -> bool
+    {
+      return std::equal_to<double>{}(lhs.Start, rhs.Start)
+          && std::equal_to<double>{}(lhs.End, rhs.End);
+    }
+  };
+  [[nodiscard]] constexpr auto Domain(const Line & ) -> Range
+  {
+    return {.Start = 0.0, .End = 1.0};
+  }
+  [[nodiscard]] constexpr auto Domain(const Ray & ) -> Range
+  {
+    return {.Start = 0.0, .End = std::numeric_limits<double>::infinity()};
+  }
+  [[nodiscard]] constexpr auto Domain(const Xline & ) -> Range
+  {
+    return {.Start = -std::numeric_limits<double>::infinity(),
+            .End   = std::numeric_limits<double>::infinity()};
+  }
+  [[nodiscard]] constexpr auto Domain(const Arc & ) -> Range
+  {
+    return {.Start = 0.0, .End = 1.0};
+  }
+  [[nodiscard]] constexpr auto Domain(const Ellipse & ) -> Range
+  {
+    return {.Start = 0.0, .End = 1.0};
+  }
+  [[nodiscard]] constexpr auto Domain(const Bezier::Quadratic & ) -> Range
+  {
+    return {.Start = 0.0, .End = 1.0};
+  }
+  [[nodiscard]] constexpr auto Domain(const Bezier::Cubic & ) -> Range
+  {
+    return {.Start = 0.0, .End = 1.0};
+  }
+  [[nodiscard]] GEOXY_API auto Domain(const Polyline &polyline) -> Range;
+  [[nodiscard]] GEOXY_API auto Domain(const Spline &spline) -> Range;
+  [[nodiscard]] GEOXY_API auto Domain(const Curve &curve) -> Range;
+}
+== geoxy/ellipse.hpp
+#include "geoxy/angle.hpp"
+#include "geoxy/matrix.hpp"
+namespace Geoxy
+{
+  struct Ellipse
+  {
+    Matrix Map   = {}; 
+    Angle  Start = {}; 
+    Angle  Sweep = {}; 
+    [[nodiscard]] friend constexpr auto operator==(const Ellipse &lhs, const Ellipse &rhs) -> bool
+    {
+      return lhs.Map == rhs.Map && lhs.Start == rhs.Start && lhs.Sweep == rhs.Sweep;
+    }
+  };
+}
+== geoxy/ends.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/place.hpp"
+#include <optional>
+namespace Geoxy
+{
+  struct Endpoints
+  {
+    std::optional<Place> Start = {}; 
+    std::optional<Place> End   = {}; 
+    [[nodiscard]] friend auto operator==(const Endpoints &lhs, const Endpoints &rhs) -> bool
+    {
+      return lhs.Start == rhs.Start && lhs.End == rhs.End;
+    }
+  };
+  [[nodiscard]] GEOXY_API auto Ends(const Curve &curve) -> Endpoints;
+}
+== geoxy/error.hpp
+#include <cstdint>
+namespace Geoxy
+{
+  enum class Error : std::uint8_t
+  {
+    Degenerate,    
+    NotFinite,     
+    TooLarge,      
+    NoConvergence, 
+    Spent,         
+  };
+}
+== geoxy/extents.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/bezier/cubic.hpp"
+#include "geoxy/bezier/quadratic.hpp"
+#include "geoxy/box.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/ellipse.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/ray.hpp"
+#include "geoxy/spline.hpp"
+#include "geoxy/xline.hpp"
+namespace Geoxy
+{
+  [[nodiscard]] GEOXY_API auto Extents(const Line &line) -> Box;
+  [[nodiscard]] GEOXY_API auto Extents(const Ray &ray) -> Box;
+  [[nodiscard]] GEOXY_API auto Extents(const Xline &xline) -> Box;
+  [[nodiscard]] GEOXY_API auto Extents(const Arc &arc) -> Box;
+  [[nodiscard]] GEOXY_API auto Extents(const Ellipse &ellipse) -> Box;
+  [[nodiscard]] GEOXY_API auto Extents(const Polyline &polyline) -> Box;
+  [[nodiscard]] GEOXY_API auto Extents(const Bezier::Quadratic &quadratic) -> Box;
+  [[nodiscard]] GEOXY_API auto Extents(const Bezier::Cubic &cubic) -> Box;
+  [[nodiscard]] GEOXY_API auto Extents(const Spline &spline) -> Box;
+  [[nodiscard]] GEOXY_API auto Extents(const Curve &curve) -> Box;
+}
+== geoxy/fillet.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/tolerance.hpp"
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <optional>
+#include <vector>
+namespace Geoxy
+{
+  enum class Misfit : std::uint8_t
+  {
+    NotFinite,  
+    Degenerate, 
+    Parallel,   
+    TooLarge,   
+    Apart,      
+  };
+  struct Filleting
+  {
+    double               Radius = 0.0; 
+    std::array<Point, 2> Picks  = {};  
+  };
+  struct Filleted
+  {
+    Curve              First  = {};    
+    Curve              Second = {};    
+    std::optional<Arc> Round  = {};    
+    std::array<Point, 2> Touches = {}; 
+  };
+  [[nodiscard]] GEOXY_API auto Fillet(const Curve &first, const Curve &second,
+                                      const Filleting &filleting)
+      -> std::expected<Filleted, Misfit>;
+  struct Untouched
+  {
+    std::size_t Vertex = 0;                
+    Misfit      Why    = Misfit::TooLarge; 
+  };
+  struct Reshaped
+  {
+    Polyline               Shape = {}; 
+    std::vector<Untouched> Left  = {}; 
+  };
+  [[nodiscard]] GEOXY_API auto Fillet(const Polyline &polyline, double radius,
+                                      const Tolerance &tolerance)
+      -> std::expected<Reshaped, Misfit>;
+}
+== geoxy/fit.hpp
+#include "geoxy/accuracy.hpp"
+#include "geoxy/api.hpp"
+#include "geoxy/error.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/spline.hpp"
+#include "geoxy/vector.hpp"
+#include <cstdint>
+#include <expected>
+#include <optional>
+#include <span>
+namespace Geoxy
+{
+  enum class Knotting : std::uint8_t
+  {
+    Chord,   
+    Root,    
+    Uniform, 
+  };
+  struct Fitting
+  {
+    Knotting              Knots  = Knotting::Chord; 
+    std::optional<Vector> Start  = {};              
+    std::optional<Vector> End    = {};              
+    bool                  Closed = false;           
+  };
+  [[nodiscard]] GEOXY_API auto Fit(std::span<const Point> points, const Fitting &fitting)
+      -> std::expected<Spline, Error>;
+  [[nodiscard]] GEOXY_API auto Inserted(const Spline &spline, double knot, int times)
+      -> std::optional<Spline>;
+  [[nodiscard]] GEOXY_API auto Elevated(const Spline &spline, int times) -> std::optional<Spline>;
+  [[nodiscard]] GEOXY_API auto Framed(const Polyline &polyline, int degree)
+      -> std::optional<Spline>;
+  [[nodiscard]] GEOXY_API auto Explode(const Spline &spline, Accuracy accuracy) -> Polyline;
+}
+== geoxy/flatten.hpp
+#include "geoxy/accuracy.hpp"
+#include "geoxy/api.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/bezier/cubic.hpp"
+#include "geoxy/bezier/quadratic.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/ellipse.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/spline.hpp"
+#include <cstddef>
+#include <vector>
+namespace Geoxy
+{
+  inline constexpr std::size_t MostChords = 65'536;
+  [[nodiscard]] GEOXY_API auto Flatten(const Line &line, Accuracy accuracy) -> std::vector<Point>;
+  [[nodiscard]] GEOXY_API auto Flatten(const Arc &arc, Accuracy accuracy) -> std::vector<Point>;
+  [[nodiscard]] GEOXY_API auto Flatten(const Ellipse &ellipse, Accuracy accuracy)
+      -> std::vector<Point>;
+  [[nodiscard]] GEOXY_API auto Flatten(const Polyline &polyline, Accuracy accuracy)
+      -> std::vector<Point>;
+  [[nodiscard]] GEOXY_API auto Flatten(const Spline &spline, Accuracy accuracy)
+      -> std::vector<Point>;
+  [[nodiscard]] GEOXY_API auto Flatten(const Bezier::Quadratic &quadratic, Accuracy accuracy)
+      -> std::vector<Point>;
+  [[nodiscard]] GEOXY_API auto Flatten(const Bezier::Cubic &cubic, Accuracy accuracy)
+      -> std::vector<Point>;
+  [[nodiscard]] GEOXY_API auto Flatten(const Curve &curve, Accuracy accuracy) -> std::vector<Point>;
+}
+== geoxy/geoxy.hpp
+#include "geoxy/accuracy.hpp"
+#include "geoxy/angle.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/area.hpp"
+#include "geoxy/arrangement.hpp"
+#include "geoxy/at.hpp"
+#include "geoxy/bezier/cubic.hpp"
+#include "geoxy/bezier/quadratic.hpp"
+#include "geoxy/box.hpp"
+#include "geoxy/chamfer.hpp"
+#include "geoxy/clip.hpp"
+#include "geoxy/cloud.hpp"
+#include "geoxy/construct.hpp"
+#include "geoxy/contain.hpp"
+#include "geoxy/curvature.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/dash.hpp"
+#include "geoxy/derivative.hpp"
+#include "geoxy/divide.hpp"
+#include "geoxy/domain.hpp"
+#include "geoxy/ellipse.hpp"
+#include "geoxy/ends.hpp"
+#include "geoxy/error.hpp"
+#include "geoxy/extents.hpp"
+#include "geoxy/fillet.hpp"
+#include "geoxy/fit.hpp"
+#include "geoxy/flatten.hpp"
+#include "geoxy/grid.hpp"
+#include "geoxy/inertia.hpp"
+#include "geoxy/intersect.hpp"
+#include "geoxy/join.hpp"
+#include "geoxy/length.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/loop.hpp"
+#include "geoxy/matrix.hpp"
+#include "geoxy/nearest.hpp"
+#include "geoxy/offset.hpp"
+#include "geoxy/orient.hpp"
+#include "geoxy/outline.hpp"
+#include "geoxy/part.hpp"
+#include "geoxy/place.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/prepared.hpp"
+#include "geoxy/ray.hpp"
+#include "geoxy/region.hpp"
+#include "geoxy/reverse.hpp"
+#include "geoxy/segment.hpp"
+#include "geoxy/space/frame.hpp"
+#include "geoxy/space/vector.hpp"
+#include "geoxy/spline.hpp"
+#include "geoxy/tangents.hpp"
+#include "geoxy/tolerance.hpp"
+#include "geoxy/transform.hpp"
+#include "geoxy/tree.hpp"
+#include "geoxy/triangulate.hpp"
+#include "geoxy/vector.hpp"
+#include "geoxy/version.hpp"
+#include "geoxy/workers.hpp"
+#include "geoxy/xline.hpp"
+== geoxy/grid.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/box.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/prepared.hpp"
+#include "geoxy/region.hpp"
+#include "geoxy/tolerance.hpp"
+#include "geoxy/workers.hpp"
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <limits>
+#include <span>
+#include <utility>
+#include <vector>
+namespace Geoxy
+{
+  class Grid
+  {
+  public:
+    using Pair = std::array<std::size_t, 2>;
+    using Sink = std::function<void(const Pair &curves, const Marking &marking)>;
+    using With =
+        std::pair<std::reference_wrapper<const Prepared>, std::reference_wrapper<const Grid>>;
+    using By = std::pair<std::reference_wrapper<const Grid>, std::reference_wrapper<Workers>>;
+    static constexpr std::size_t Outside = std::numeric_limits<std::size_t>::max();
+    GEOXY_API Grid(std::span<const Curve> curves, const Tolerance &tolerance);
+    GEOXY_API Grid(const Grid &other);
+    Grid(Grid &&other) noexcept = default;
+    GEOXY_API auto operator=(const Grid &other) -> Grid &;
+    auto operator=(Grid &&other) noexcept -> Grid & = default;
+    ~Grid() = default;
+    [[nodiscard]] auto Size() const -> std::size_t { return m_Curves.size(); }
+    [[nodiscard]] auto operator[](std::size_t index) const -> const Prepared &
+    {
+      return m_Prepared[index];
+    }
+    GEOXY_API void Moved(std::size_t index, Curve curve);
+    [[nodiscard]] GEOXY_API auto Near(const Box &box) const -> std::vector<std::size_t>;
+    [[nodiscard]] GEOXY_API auto Window(const Box &box) const -> std::vector<std::size_t>;
+    [[nodiscard]] GEOXY_API auto Crossing(const Box &box) const -> std::vector<std::size_t>;
+    [[nodiscard]] GEOXY_API auto Window(const Region &region) const -> std::vector<std::size_t>;
+    [[nodiscard]] GEOXY_API auto Crossing(const Region &region) const -> std::vector<std::size_t>;
+  private:
+    friend struct Gridwork;
+    struct Entry
+    {
+      Box           Grown  = {}; 
+      std::size_t   Index  = 0;  
+      std::uint32_t Column = 0;  
+      std::uint32_t Row    = 0;  
+    };
+    struct Cell
+    {
+      std::size_t First = 0; 
+      std::size_t Count = 0; 
+      std::size_t Room  = 0; 
+    };
+    struct Tiling
+    {
+      Point                     Origin  = {};  
+      double                    Scale   = 0.0; 
+      std::uint32_t             Columns = 1;   
+      std::uint32_t             Rows    = 1;   
+      std::vector<Cell>         Cells   = {};  
+      std::vector<Entry>        Entries = {};  
+      std::size_t               Live    = 0;   
+      std::vector<std::uint8_t> Loose   = {};  
+      std::vector<std::size_t>  Unboxed = {};  
+    };
+    std::vector<Curve>        m_Curves    = {}; 
+    std::vector<Prepared>     m_Prepared  = {}; 
+    Tolerance                 m_Tolerance = {}; 
+    std::vector<double>       m_MinX      = {}; 
+    std::vector<double>       m_MinY      = {}; 
+    std::vector<double>       m_MaxX      = {}; 
+    std::vector<double>       m_MaxY      = {}; 
+    std::vector<double>       m_Grain     = {}; 
+    std::vector<std::uint8_t> m_Shapes    = {}; 
+    Tiling                    m_Tiling    = {}; 
+  };
+  GEOXY_API void IntersectAll(const Grid &grid, const Tolerance &tolerance, const Grid::Sink &sink);
+  GEOXY_API void IntersectAll(const Grid::By &by, const Tolerance &tolerance,
+                              const Grid::Sink &sink);
+  GEOXY_API void IntersectWith(const Grid::With &with, const Tolerance &tolerance,
+                               const Grid::Sink &sink);
+}
+== geoxy/inertia.hpp
+#include "geoxy/accuracy.hpp"
+#include "geoxy/api.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/vector.hpp"
+#include <optional>
+namespace Geoxy
+{
+  struct Moments
+  {
+    double Area     = 0.0; 
+    Point  Centroid = {};  
+    double AboutX   = 0.0; 
+    double AboutY   = 0.0; 
+    double Product  = 0.0; 
+  };
+  struct Principal
+  {
+    double Least = 0.0; 
+    double Most  = 0.0; 
+    Vector Axis  = {};  
+  };
+  [[nodiscard]] GEOXY_API auto Inertia(const Curve &curve, Accuracy accuracy)
+      -> std::optional<Moments>;
+  [[nodiscard]] GEOXY_API auto Axes(const Moments &moments) -> Principal;
+}
+== geoxy/intersect.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/domain.hpp"
+#include "geoxy/place.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/tolerance.hpp"
+#include <array>
+#include <cstdint>
+#include <functional>
+#include <vector>
+namespace Geoxy
+{
+  enum class Contact : std::uint8_t
+  {
+    Cross, 
+    Touch, 
+    End,   
+  };
+  struct Hit
+  {
+    Point   At     = {};             
+    Place   First  = {};             
+    Place   Second = {};             
+    Contact Kind   = Contact::Cross; 
+  };
+  struct Overlap
+  {
+    Range First  = {};    
+    Range Second = {};    
+    bool  Along  = false; 
+  };
+  struct Intersections
+  {
+    std::vector<Hit>     Hits     = {};    
+    std::vector<Overlap> Overlaps = {};    
+    bool                 Spent    = false; 
+  };
+  [[nodiscard]] GEOXY_API auto Intersect(const Curve &first, const Curve &second,
+                                         const Tolerance &tolerance) -> Intersections;
+  using Curves = std::array<std::reference_wrapper<const Curve>, 2>;
+  GEOXY_API void Intersect(const Curves &curves, const Tolerance &tolerance, Intersections &into);
+  [[nodiscard]] GEOXY_API auto SelfIntersect(const Curve &curve, const Tolerance &tolerance)
+      -> Intersections;
+}
+== geoxy/join.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/tolerance.hpp"
+#include <optional>
+#include <span>
+namespace Geoxy
+{
+  [[nodiscard]] GEOXY_API auto Join(std::span<const Curve> curves, const Tolerance &tolerance)
+      -> std::optional<Curve>;
+}
+== geoxy/length.hpp
+#include "geoxy/accuracy.hpp"
+#include "geoxy/api.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/bezier/cubic.hpp"
+#include "geoxy/bezier/quadratic.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/domain.hpp"
+#include "geoxy/ellipse.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/place.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/ray.hpp"
+#include "geoxy/spline.hpp"
+#include "geoxy/xline.hpp"
+namespace Geoxy
+{
+  [[nodiscard]] GEOXY_API auto Length(const Line &line) -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Ray &ray) -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Xline &xline) -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Arc &arc) -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Ellipse &ellipse) -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Polyline &polyline) -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Spline &spline, Accuracy accuracy) -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Bezier::Quadratic &quadratic, Accuracy accuracy)
+      -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Bezier::Cubic &cubic, Accuracy accuracy) -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Curve &curve, Accuracy accuracy) -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Line &line, Range stretch) -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Ray &ray, Range stretch) -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Xline &xline, Range stretch) -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Arc &arc, Range stretch) -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Ellipse &ellipse, Range stretch) -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Polyline &polyline, Range stretch) -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Spline &spline, Range stretch, Accuracy accuracy)
+      -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Bezier::Quadratic &quadratic, Range stretch,
+                                      Accuracy accuracy) -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Bezier::Cubic &cubic, Range stretch, Accuracy accuracy)
+      -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Curve &curve, Range stretch, Accuracy accuracy)
+      -> double;
+  [[nodiscard]] GEOXY_API auto PlaceAt(const Line &line, double distance) -> Place;
+  [[nodiscard]] GEOXY_API auto PlaceAt(const Ray &ray, double distance) -> Place;
+  [[nodiscard]] GEOXY_API auto PlaceAt(const Xline &xline, double distance) -> Place;
+  [[nodiscard]] GEOXY_API auto PlaceAt(const Arc &arc, double distance) -> Place;
+  [[nodiscard]] GEOXY_API auto PlaceAt(const Ellipse &ellipse, double distance) -> Place;
+  [[nodiscard]] GEOXY_API auto PlaceAt(const Polyline &polyline, double distance) -> Place;
+  [[nodiscard]] GEOXY_API auto PlaceAt(const Spline &spline, double distance, Accuracy accuracy)
+      -> Place;
+  [[nodiscard]] GEOXY_API auto PlaceAt(const Bezier::Quadratic &quadratic, double distance,
+                                       Accuracy accuracy) -> Place;
+  [[nodiscard]] GEOXY_API auto PlaceAt(const Bezier::Cubic &cubic, double distance,
+                                       Accuracy accuracy) -> Place;
+  [[nodiscard]] GEOXY_API auto PlaceAt(const Curve &curve, double distance, Accuracy accuracy)
+      -> Place;
+}
+== geoxy/line.hpp
+#include "geoxy/point.hpp"
+namespace Geoxy
+{
+  struct Line
+  {
+    Point Start = {}; 
+    Point End   = {}; 
+    [[nodiscard]] friend constexpr auto operator==(const Line &lhs, const Line &rhs) -> bool
+    {
+      return lhs.Start == rhs.Start && lhs.End == rhs.End;
+    }
+  };
+}
+== geoxy/loop.hpp
+#include "geoxy/accuracy.hpp"
+#include "geoxy/api.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/tolerance.hpp"
+#include <optional>
+#include <vector>
+namespace Geoxy
+{
+  struct Loop
+  {
+    std::vector<Curve> Edges = {}; 
+    [[nodiscard]] friend auto operator==(const Loop &lhs, const Loop &rhs) -> bool
+    {
+      return lhs.Edges == rhs.Edges;
+    }
+  };
+  [[nodiscard]] GEOXY_API auto Winding(const Loop &loop, Point point, const Tolerance &tolerance)
+      -> std::optional<int>;
+  [[nodiscard]] GEOXY_API auto Area(const Loop &loop, Accuracy accuracy) -> double;
+  [[nodiscard]] GEOXY_API auto Length(const Loop &loop, Accuracy accuracy) -> double;
+  [[nodiscard]] GEOXY_API auto Closed(const Loop &loop, const Tolerance &tolerance) -> bool;
+}
+== geoxy/matrix.hpp
+#include "geoxy/angle.hpp"
+#include "geoxy/api.hpp"
+#include "geoxy/box.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/vector.hpp"
+#include <optional>
+namespace Geoxy
+{
+  struct Matrix
+  {
+    Vector X      = {.X = 1.0, .Y = 0.0}; 
+    Vector Y      = {.X = 0.0, .Y = 1.0}; 
+    Point  Origin = {};                   
+    [[nodiscard]] friend constexpr auto operator==(const Matrix &lhs, const Matrix &rhs) -> bool
+    {
+      return lhs.X == rhs.X && lhs.Y == rhs.Y && lhs.Origin == rhs.Origin;
+    }
+  };
+  [[nodiscard]] constexpr auto Translation(Vector displacement) -> Matrix
+  {
+    return {.Origin = Point{} + displacement};
+  }
+  [[nodiscard]] constexpr auto Scaling(double alongX, double alongY) -> Matrix
+  {
+    return {.X = {.X = alongX, .Y = 0.0}, .Y = {.X = 0.0, .Y = alongY}};
+  }
+  [[nodiscard]] constexpr auto Scaling(double factor) -> Matrix
+  {
+    return Scaling(factor, factor);
+  }
+  [[nodiscard]] GEOXY_API auto Rotation(Angle angle) -> Matrix;
+  [[nodiscard]] GEOXY_API auto Rotation(Angle angle, Point about) -> Matrix;
+  [[nodiscard]] GEOXY_API auto Mirror(Point first, Point second) -> std::optional<Matrix>;
+  [[nodiscard]] GEOXY_API auto operator*(const Matrix &lhs, const Matrix &rhs) -> Matrix;
+  [[nodiscard]] GEOXY_API auto operator*(const Matrix &lhs, Point rhs) -> Point;
+  [[nodiscard]] GEOXY_API auto operator*(const Matrix &lhs, Vector rhs) -> Vector;
+  [[nodiscard]] GEOXY_API auto operator*(const Matrix &lhs, const Box &rhs) -> Box;
+  [[nodiscard]] GEOXY_API auto Determinant(const Matrix &map) -> double;
+  [[nodiscard]] GEOXY_API auto Inverse(const Matrix &map) -> std::optional<Matrix>;
+  [[nodiscard]] GEOXY_API auto Stretch(const Matrix &map) -> double;
+}
+== geoxy/nearest.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/bezier/cubic.hpp"
+#include "geoxy/bezier/quadratic.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/ellipse.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/place.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/ray.hpp"
+#include "geoxy/spline.hpp"
+#include "geoxy/xline.hpp"
+#include <vector>
+namespace Geoxy
+{
+  [[nodiscard]] GEOXY_API auto Perpendiculars(const Line &line, Point point) -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Perpendiculars(const Ray &ray, Point point) -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Perpendiculars(const Xline &xline, Point point)
+      -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Perpendiculars(const Arc &arc, Point point) -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Perpendiculars(const Ellipse &ellipse, Point point)
+      -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Perpendiculars(const Polyline &polyline, Point point)
+      -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Perpendiculars(const Spline &spline, Point point)
+      -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Perpendiculars(const Bezier::Quadratic &quadratic, Point point)
+      -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Perpendiculars(const Bezier::Cubic &cubic, Point point)
+      -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Perpendiculars(const Curve &curve, Point point)
+      -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Nearest(const Line &line, Point point) -> Place;
+  [[nodiscard]] GEOXY_API auto Nearest(const Ray &ray, Point point) -> Place;
+  [[nodiscard]] GEOXY_API auto Nearest(const Xline &xline, Point point) -> Place;
+  [[nodiscard]] GEOXY_API auto Nearest(const Arc &arc, Point point) -> Place;
+  [[nodiscard]] GEOXY_API auto Nearest(const Ellipse &ellipse, Point point) -> Place;
+  [[nodiscard]] GEOXY_API auto Nearest(const Polyline &polyline, Point point) -> Place;
+  [[nodiscard]] GEOXY_API auto Nearest(const Spline &spline, Point point) -> Place;
+  [[nodiscard]] GEOXY_API auto Nearest(const Bezier::Quadratic &quadratic, Point point) -> Place;
+  [[nodiscard]] GEOXY_API auto Nearest(const Bezier::Cubic &cubic, Point point) -> Place;
+  [[nodiscard]] GEOXY_API auto Nearest(const Curve &curve, Point point) -> Place;
+}
+== geoxy/offset.hpp
+#include "geoxy/accuracy.hpp"
+#include "geoxy/api.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/ellipse.hpp"
+#include "geoxy/error.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/ray.hpp"
+#include "geoxy/spline.hpp"
+#include "geoxy/tolerance.hpp"
+#include "geoxy/xline.hpp"
+#include <cstdint>
+#include <expected>
+#include <vector>
+namespace Geoxy
+{
+  enum class Gap : std::uint8_t
+  {
+    Extend,  
+    Fillet,  
+    Chamfer, 
+  };
+  struct Offsetting
+  {
+    double Distance = 0.0;                
+    Gap      Gaps          = Gap::Extend; 
+    Accuracy Approximation = {};          
+  };
+  enum class Side : std::uint8_t
+  {
+    Inward,  
+    Outward, 
+    Both,    
+  };
+  enum class Fills : std::uint8_t
+  {
+    NonZero, 
+    EvenOdd, 
+  };
+  enum class Cap : std::uint8_t
+  {
+    Round,  
+    Flat,   
+    Square, 
+  };
+  struct Buffering
+  {
+    double Distance = 0.0;            
+    Side   Sides    = Side::Outward;  
+    Fills  Fill     = Fills::NonZero; 
+    Gap    Gaps     = Gap::Fillet;    
+    Cap    Ends     = Cap::Round;     
+  };
+  [[nodiscard]] GEOXY_API auto Offset(const Line &line, double distance)
+      -> std::expected<Line, Error>;
+  [[nodiscard]] GEOXY_API auto Offset(const Ray &ray, double distance) -> std::expected<Ray, Error>;
+  [[nodiscard]] GEOXY_API auto Offset(const Xline &xline, double distance)
+      -> std::expected<Xline, Error>;
+  [[nodiscard]] GEOXY_API auto Offset(const Arc &arc, double distance) -> std::expected<Arc, Error>;
+  [[nodiscard]] GEOXY_API auto Offset(const Polyline &polyline, const Offsetting &offsetting,
+                                      const Tolerance &tolerance)
+      -> std::expected<std::vector<Polyline>, Error>;
+  [[nodiscard]] GEOXY_API auto Buffer(const Polyline &polyline, const Buffering &buffering,
+                                      const Tolerance &tolerance)
+      -> std::expected<std::vector<Polyline>, Error>;
+  [[nodiscard]] GEOXY_API auto Offset(const Ellipse &ellipse, const Offsetting &offsetting,
+                                      const Tolerance &tolerance)
+      -> std::expected<std::vector<Polyline>, Error>;
+  [[nodiscard]] GEOXY_API auto Offset(const Spline &spline, const Offsetting &offsetting,
+                                      const Tolerance &tolerance)
+      -> std::expected<std::vector<Polyline>, Error>;
+  [[nodiscard]] GEOXY_API auto Offset(const Curve &curve, const Offsetting &offsetting,
+                                      const Tolerance &tolerance)
+      -> std::expected<std::vector<Curve>, Error>;
+}
+== geoxy/orient.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/point.hpp"
+#include <cstdint>
+namespace Geoxy
+{
+  enum class Orientation : std::int8_t
+  {
+    Clockwise        = -1, 
+    Collinear        =  0, 
+    Counterclockwise =  1, 
+  };
+  [[nodiscard]] GEOXY_API auto Orient(Point first, Point second, Point third) -> Orientation;
+}
+== geoxy/outline.hpp
+#include "geoxy/accuracy.hpp"
+#include "geoxy/api.hpp"
+#include "geoxy/polyline.hpp"
+#include <span>
+#include <vector>
+namespace Geoxy
+{
+  struct Width
+  {
+    double Start = 0.0; 
+    double End   = 0.0; 
+  };
+  [[nodiscard]] GEOXY_API auto Outline(const Polyline &polyline, std::span<const Width> widths,
+                                       Accuracy accuracy) -> std::vector<Polyline>;
+}
+== geoxy/part.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/bezier/cubic.hpp"
+#include "geoxy/bezier/quadratic.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/domain.hpp"
+#include "geoxy/ellipse.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/ray.hpp"
+#include "geoxy/spline.hpp"
+#include "geoxy/xline.hpp"
+#include <cstdint>
+#include <optional>
+#include <span>
+#include <vector>
+namespace Geoxy
+{
+  enum class Keep : std::uint8_t
+  {
+    Start, 
+    End,   
+  };
+  [[nodiscard]] GEOXY_API auto Part(const Line &line, Range stretch) -> Line;
+  [[nodiscard]] GEOXY_API auto Part(const Ray &ray, Range stretch) -> Curve;
+  [[nodiscard]] GEOXY_API auto Part(const Xline &xline, Range stretch) -> Curve;
+  [[nodiscard]] GEOXY_API auto Part(const Arc &arc, Range stretch) -> Arc;
+  [[nodiscard]] GEOXY_API auto Part(const Ellipse &ellipse, Range stretch) -> Ellipse;
+  [[nodiscard]] GEOXY_API auto Part(const Polyline &polyline, Range stretch)
+      -> std::optional<Polyline>;
+  [[nodiscard]] GEOXY_API auto Part(const Spline &spline, Range stretch) -> Spline;
+  [[nodiscard]] GEOXY_API auto Part(const Bezier::Quadratic &quadratic, Range stretch)
+      -> Bezier::Quadratic;
+  [[nodiscard]] GEOXY_API auto Part(const Bezier::Cubic &cubic, Range stretch) -> Bezier::Cubic;
+  [[nodiscard]] GEOXY_API auto Part(const Curve &curve, Range stretch) -> std::optional<Curve>;
+  [[nodiscard]] GEOXY_API auto Trim(const Curve &curve, double along, Keep keep)
+      -> std::optional<Curve>;
+  [[nodiscard]] GEOXY_API auto Extend(const Curve &curve, double along) -> std::optional<Curve>;
+  [[nodiscard]] GEOXY_API auto Split(const Curve &curve, std::span<const double> alongs)
+      -> std::vector<Curve>;
+}
+== geoxy/place.hpp
+#include "geoxy/point.hpp"
+#include <functional>
+namespace Geoxy
+{
+  struct Place
+  {
+    Point  At    = {};  
+    double Along = 0.0; 
+    [[nodiscard]] friend constexpr auto operator==(const Place &lhs, const Place &rhs) -> bool
+    {
+      return lhs.At == rhs.At && std::equal_to<double>{}(lhs.Along, rhs.Along);
+    }
+  };
+}
+== geoxy/point.hpp
+#include "geoxy/vector.hpp"
+#include <functional>
+#include <numeric>
+namespace Geoxy
+{
+  struct Point
+  {
+    double X = 0.0; 
+    double Y = 0.0; 
+    [[nodiscard]] friend constexpr auto operator==(const Point &lhs, const Point &rhs) -> bool
+    {
+      return std::equal_to<double>{}(lhs.X, rhs.X) && std::equal_to<double>{}(lhs.Y, rhs.Y);
+    }
+  };
+  [[nodiscard]] constexpr auto operator-(Point lhs, Point rhs) -> Vector
+  {
+    return {.X = lhs.X - rhs.X, .Y = lhs.Y - rhs.Y};
+  }
+  [[nodiscard]] constexpr auto operator+(Point lhs, Vector rhs) -> Point
+  {
+    return {.X = lhs.X + rhs.X, .Y = lhs.Y + rhs.Y};
+  }
+  [[nodiscard]] constexpr auto operator-(Point lhs, Vector rhs) -> Point
+  {
+    return {.X = lhs.X - rhs.X, .Y = lhs.Y - rhs.Y};
+  }
+  [[nodiscard]] constexpr auto Midpoint(Point first, Point second) -> Point
+  {
+    return {.X = std::midpoint(first.X, second.X), .Y = std::midpoint(first.Y, second.Y)};
+  }
+  [[nodiscard]] constexpr auto Lerp(Point start, Point end, double fraction) -> Point
+  {
+    const Vector across = end - start;
+    if (fraction <= 0.5)
+    {
+      return start + (across * fraction);
+    }
+    return end - (across * (1.0 - fraction));
+  }
+  [[nodiscard]] inline auto Distance(Point first, Point second) -> double
+  {
+    return Length(second - first);
+  }
+}
+== geoxy/polyline.hpp
+#include "geoxy/point.hpp"
+#include <functional>
+#include <vector>
+namespace Geoxy
+{
+  struct Vertex
+  {
+    Point  Position = {}; 
+    double Bulge =
+        0.0; 
+    [[nodiscard]] friend constexpr auto operator==(const Vertex &lhs, const Vertex &rhs) -> bool
+    {
+      return lhs.Position == rhs.Position && std::equal_to<double>{}(lhs.Bulge, rhs.Bulge);
+    }
+  };
+  struct Polyline
+  {
+    std::vector<Vertex> Vertices = {};    
+    bool                Closed   = false; 
+    [[nodiscard]] friend auto operator==(const Polyline &lhs, const Polyline &rhs) -> bool
+    {
+      return lhs.Closed == rhs.Closed && lhs.Vertices == rhs.Vertices;
+    }
+  };
+}
+== geoxy/prepared.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/box.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/intersect.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/tolerance.hpp"
+#include "geoxy/vector.hpp"
+#include <array>
+#include <functional>
+#include <memory>
+#include <vector>
+namespace Geoxy
+{
+  struct Legwork;
+  struct Standby;
+  class Prepared
+  {
+  public:
+    using Pair = std::array<std::reference_wrapper<const Prepared>, 2>;
+    GEOXY_API explicit Prepared(const Curve &curve);
+    explicit Prepared(const Curve &&) = delete;
+    [[nodiscard]] auto Shape() const -> const Curve & { return *m_Shape; }
+  private:
+    friend struct Abutting;
+    friend struct Glancing;
+    friend struct Preparing;
+    Box                  m_Box     = {};      
+    double               m_Reach   = 0.0;     
+    double               m_Size    = 0.0;     
+    bool                 m_Boxed   = false;   
+    bool                 m_Plain   = false;   
+    bool                 m_Round   = false;   
+    const Curve         *m_Shape   = nullptr; 
+    std::array<Point, 2> m_Ends    = {};      
+    double               m_Sweep   = 0.0;     
+    Vector               m_Slip    = {};      
+    double               m_Long    = 0.0;     
+    double               m_Square  = 0.0;     
+    double               m_Under   = 0.0;     
+    double               m_Inverse = 0.0;     
+    std::shared_ptr<const Legwork> m_Legwork = nullptr; 
+    std::shared_ptr<const Standby> m_Standby = nullptr; 
+  };
+  struct Mark
+  {
+    Point   At   = {};             
+    Contact Kind = Contact::Cross; 
+    [[nodiscard]] friend constexpr auto operator==(const Mark &lhs, const Mark &rhs) -> bool
+    {
+      return lhs.At == rhs.At && lhs.Kind == rhs.Kind;
+    }
+  };
+  struct Marking
+  {
+    std::vector<Mark>    Marks    = {}; 
+    std::vector<Overlap> Overlaps = {}; 
+    bool                 Spent = false; 
+  };
+  GEOXY_API void Intersect(const Prepared::Pair &curves, const Tolerance &tolerance,
+                           Intersections &into);
+  GEOXY_API void Intersect(const Prepared::Pair &curves, const Tolerance &tolerance, Marking &into);
+}
+== geoxy/ray.hpp
+#include "geoxy/point.hpp"
+#include "geoxy/vector.hpp"
+namespace Geoxy
+{
+  struct Ray
+  {
+    Point  Start = {}; 
+    Vector Way   = {}; 
+    [[nodiscard]] friend constexpr auto operator==(const Ray &lhs, const Ray &rhs) -> bool
+    {
+      return lhs.Start == rhs.Start && lhs.Way == rhs.Way;
+    }
+  };
+}
+== geoxy/region.hpp
+#include "geoxy/accuracy.hpp"
+#include "geoxy/api.hpp"
+#include "geoxy/error.hpp"
+#include "geoxy/loop.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/tolerance.hpp"
+#include <cstdint>
+#include <expected>
+#include <vector>
+namespace Geoxy
+{
+  struct Region
+  {
+    std::vector<Loop> Loops = {}; 
+    [[nodiscard]] friend auto operator==(const Region &lhs, const Region &rhs) -> bool
+    {
+      return lhs.Loops == rhs.Loops;
+    }
+  };
+  enum class Location : std::uint8_t
+  {
+    Outside, 
+    On,      
+    Inside,  
+  };
+  [[nodiscard]] GEOXY_API auto Locate(const Region &region, Point point, const Tolerance &tolerance)
+      -> Location;
+  [[nodiscard]] GEOXY_API auto Area(const Region &region, Accuracy accuracy) -> double;
+  [[nodiscard]] GEOXY_API auto Filled(const Region &region, const Tolerance &tolerance)
+      -> std::expected<Region, Error>;
+  [[nodiscard]] GEOXY_API auto Union(const Region &first, const Region &second,
+                                     const Tolerance &tolerance) -> std::expected<Region, Error>;
+  [[nodiscard]] GEOXY_API auto Difference(const Region &first, const Region &second,
+                                          const Tolerance &tolerance)
+      -> std::expected<Region, Error>;
+  [[nodiscard]] GEOXY_API auto Intersection(const Region &first, const Region &second,
+                                            const Tolerance &tolerance)
+      -> std::expected<Region, Error>;
+}
+== geoxy/reverse.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/bezier/cubic.hpp"
+#include "geoxy/bezier/quadratic.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/ellipse.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/spline.hpp"
+#include "geoxy/xline.hpp"
+#include <optional>
+namespace Geoxy
+{
+  [[nodiscard]] GEOXY_API auto Reversed(const Line &line) -> Line;
+  [[nodiscard]] GEOXY_API auto Reversed(const Xline &xline) -> Xline;
+  [[nodiscard]] GEOXY_API auto Reversed(const Arc &arc) -> Arc;
+  [[nodiscard]] GEOXY_API auto Reversed(const Ellipse &ellipse) -> Ellipse;
+  [[nodiscard]] GEOXY_API auto Reversed(const Polyline &polyline) -> Polyline;
+  [[nodiscard]] GEOXY_API auto Reversed(const Spline &spline) -> Spline;
+  [[nodiscard]] GEOXY_API auto Reversed(const Bezier::Quadratic &quadratic) -> Bezier::Quadratic;
+  [[nodiscard]] GEOXY_API auto Reversed(const Bezier::Cubic &cubic) -> Bezier::Cubic;
+  [[nodiscard]] GEOXY_API auto Reversed(const Curve &curve) -> std::optional<Curve>;
+}
+== geoxy/segment.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/polyline.hpp"
+#include <cstddef>
+#include <variant>
+namespace Geoxy
+{
+  using Segment = std::variant<Line, Arc>;
+  inline constexpr double Straight = 0x1p-60;
+  [[nodiscard]] GEOXY_API auto Bent(Point start, Point end, double bulge) -> Segment;
+  [[nodiscard]] GEOXY_API auto Count(const Polyline &polyline) -> std::size_t;
+  [[nodiscard]] GEOXY_API auto Nth(const Polyline &polyline, std::size_t index) -> Segment;
+}
+== geoxy/space/frame.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/matrix.hpp"
+#include "geoxy/space/vector.hpp"
+#include <optional>
+namespace Geoxy::Space
+{
+  struct Frame
+  {
+    Vector X = East;  
+    Vector Y = North; 
+    Vector Z = Up;    
+    [[nodiscard]] friend constexpr auto operator==(const Frame &lhs, const Frame &rhs) -> bool
+    {
+      return lhs.X == rhs.X && lhs.Y == rhs.Y && lhs.Z == rhs.Z;
+    }
+  };
+  [[nodiscard]] GEOXY_API auto Facing(const Vector &normal) -> std::optional<Frame>;
+  [[nodiscard]] GEOXY_API auto Plan(const Frame &frame, double elevation) -> Geoxy::Matrix;
+}
+== geoxy/space/vector.hpp
+#include "geoxy/api.hpp"
+#include <functional>
+#include <optional>
+namespace Geoxy::Space
+{
+  struct Vector
+  {
+    double X = 0.0; 
+    double Y = 0.0; 
+    double Z = 0.0; 
+    [[nodiscard]] friend constexpr auto operator==(const Vector &lhs, const Vector &rhs) -> bool
+    {
+      return std::equal_to<double>{}(lhs.X, rhs.X)
+          && std::equal_to<double>{}(lhs.Y, rhs.Y)
+          && std::equal_to<double>{}(lhs.Z, rhs.Z);
+    }
+  };
+  inline constexpr Vector East{.X = 1.0, .Y = 0.0, .Z = 0.0};
+  inline constexpr Vector North{.X = 0.0, .Y = 1.0, .Z = 0.0};
+  inline constexpr Vector Up{.X = 0.0, .Y = 0.0, .Z = 1.0};
+  [[nodiscard]] GEOXY_API auto Dot(const Vector &first, const Vector &second) -> double;
+  [[nodiscard]] GEOXY_API auto Cross(const Vector &first, const Vector &second) -> Vector;
+  [[nodiscard]] GEOXY_API auto Length(const Vector &vector) -> double;
+  [[nodiscard]] GEOXY_API auto Unit(const Vector &vector) -> std::optional<Vector>;
+}
+== geoxy/spline.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/point.hpp"
+#include <vector>
+namespace Geoxy
+{
+  inline constexpr int MaxDegree = 31;
+  struct Spline
+  {
+    int                 Degree  = 3;  
+    std::vector<double> Knots   = {}; 
+    std::vector<Point>  Poles   = {}; 
+    std::vector<double> Weights = {}; 
+    [[nodiscard]] friend auto operator==(const Spline &lhs, const Spline &rhs) -> bool
+    {
+      return lhs.Degree  == rhs.Degree
+          && lhs.Knots   == rhs.Knots
+          && lhs.Poles   == rhs.Poles
+          && lhs.Weights == rhs.Weights;
+    }
+  };
+  [[nodiscard]] GEOXY_API auto Valid(const Spline &spline) -> bool;
+}
+== geoxy/tangents.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/bezier/cubic.hpp"
+#include "geoxy/bezier/quadratic.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/ellipse.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/place.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/ray.hpp"
+#include "geoxy/spline.hpp"
+#include "geoxy/xline.hpp"
+#include <vector>
+namespace Geoxy
+{
+  [[nodiscard]] GEOXY_API auto Tangents(const Line &line, Point point) -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Tangents(const Ray &ray, Point point) -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Tangents(const Xline &xline, Point point) -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Tangents(const Arc &arc, Point point) -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Tangents(const Ellipse &ellipse, Point point) -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Tangents(const Polyline &polyline, Point point)
+      -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Tangents(const Spline &spline, Point point) -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Tangents(const Bezier::Quadratic &quadratic, Point point)
+      -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Tangents(const Bezier::Cubic &cubic, Point point)
+      -> std::vector<Place>;
+  [[nodiscard]] GEOXY_API auto Tangents(const Curve &curve, Point point) -> std::vector<Place>;
+}
+== geoxy/tolerance.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/box.hpp"
+#include "geoxy/point.hpp"
+namespace Geoxy
+{
+  struct Tolerance
+  {
+    double Length  = 0.0; 
+    double Radians = 0.0; 
+    [[nodiscard]] GEOXY_API static auto Of(const Box &extents) -> Tolerance;
+  };
+  [[nodiscard]] GEOXY_API auto Same(Point first, Point second, const Tolerance &tolerance) -> bool;
+  [[nodiscard]] GEOXY_API auto Grain(double value) -> double;
+  [[nodiscard]] GEOXY_API auto Grain(Point point) -> double;
+}
+== geoxy/transform.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/arc.hpp"
+#include "geoxy/bezier/cubic.hpp"
+#include "geoxy/bezier/quadratic.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/ellipse.hpp"
+#include "geoxy/line.hpp"
+#include "geoxy/matrix.hpp"
+#include "geoxy/polyline.hpp"
+#include "geoxy/ray.hpp"
+#include "geoxy/spline.hpp"
+#include "geoxy/xline.hpp"
+namespace Geoxy
+{
+  [[nodiscard]] GEOXY_API auto Transformed(const Line &line, const Matrix &map) -> Line;
+  [[nodiscard]] GEOXY_API auto Transformed(const Ray &ray, const Matrix &map) -> Ray;
+  [[nodiscard]] GEOXY_API auto Transformed(const Xline &xline, const Matrix &map) -> Xline;
+  [[nodiscard]] GEOXY_API auto Transformed(const Arc &arc, const Matrix &map) -> Curve;
+  [[nodiscard]] GEOXY_API auto Transformed(const Ellipse &ellipse, const Matrix &map) -> Ellipse;
+  [[nodiscard]] GEOXY_API auto Transformed(const Polyline &polyline, const Matrix &map) -> Curve;
+  [[nodiscard]] GEOXY_API auto Transformed(const Spline &spline, const Matrix &map) -> Spline;
+  [[nodiscard]] GEOXY_API auto Transformed(const Bezier::Quadratic &quadratic, const Matrix &map)
+      -> Bezier::Quadratic;
+  [[nodiscard]] GEOXY_API auto Transformed(const Bezier::Cubic &cubic, const Matrix &map)
+      -> Bezier::Cubic;
+  [[nodiscard]] GEOXY_API auto Transformed(const Curve &curve, const Matrix &map) -> Curve;
+}
+== geoxy/tree.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/box.hpp"
+#include "geoxy/curve.hpp"
+#include "geoxy/place.hpp"
+#include "geoxy/point.hpp"
+#include "geoxy/ray.hpp"
+#include "geoxy/tolerance.hpp"
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <limits>
+#include <memory>
+#include <span>
+#include <vector>
+namespace Geoxy
+{
+  struct Boughs;
+  class Tree
+  {
+  public:
+    struct Close
+    {
+      std::size_t Index    = 0;   
+      Place       Nearest  = {};  
+      double      Distance = 0.0; 
+      [[nodiscard]] friend constexpr auto operator==(const Close &lhs, const Close &rhs) -> bool
+      {
+        return lhs.Index == rhs.Index
+            && lhs.Nearest == rhs.Nearest
+            && std::equal_to<double>{}(lhs.Distance, rhs.Distance);
+      }
+    };
+    struct Strike
+    {
+      std::size_t Index = 0;   
+      Point       At    = {};  
+      double      Along = 0.0; 
+      [[nodiscard]] friend constexpr auto operator==(const Strike &lhs, const Strike &rhs) -> bool
+      {
+        return lhs.Index == rhs.Index
+            && lhs.At == rhs.At
+            && std::equal_to<double>{}(lhs.Along, rhs.Along);
+      }
+    };
+    static constexpr double Anywhere = std::numeric_limits<double>::infinity();
+    GEOXY_API Tree();
+    GEOXY_API explicit Tree(std::span<const Curve> curves);
+    GEOXY_API Tree(const Tree &other);
+    GEOXY_API Tree(Tree &&other) noexcept;
+    GEOXY_API auto operator=(const Tree &other) -> Tree &;
+    GEOXY_API auto operator=(Tree &&other) noexcept -> Tree &;
+    GEOXY_API ~Tree();
+    [[nodiscard]] auto Size() const -> std::size_t { return m_Count; }
+    [[nodiscard]] auto Holds(std::size_t index) const -> bool
+    {
+      return index < m_Held.size() && m_Held[index] != 0;
+    }
+    [[nodiscard]] auto operator[](std::size_t index) const -> const Curve &
+    {
+      return m_Curves[index];
+    }
+    GEOXY_API auto Insert(Curve curve) -> std::size_t;
+    GEOXY_API void Erase(std::size_t index);
+    [[nodiscard]] GEOXY_API auto Near(const Box &box) const -> std::vector<std::size_t>;
+    [[nodiscard]] GEOXY_API auto Window(const Box &box) const -> std::vector<std::size_t>;
+    [[nodiscard]] GEOXY_API auto Crossing(const Box &box) const -> std::vector<std::size_t>;
+    [[nodiscard]] GEOXY_API auto Nearest(Point point, std::size_t count, double within) const
+        -> std::vector<Close>;
+    [[nodiscard]] GEOXY_API auto Cast(const Ray &ray, const Tolerance &tolerance) const
+        -> std::vector<Strike>;
+  private:
+    std::vector<Curve>        m_Curves = {}; 
+    std::vector<std::uint8_t> m_Held   = {}; 
+    std::vector<std::size_t>  m_Spare  = {}; 
+    std::size_t               m_Count  = 0;  
+    double m_Size = 0.0; 
+    std::unique_ptr<Boughs> m_Boughs; 
+  };
+}
+== geoxy/triangulate.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/point.hpp"
+#include <array>
+#include <cstdint>
+#include <span>
+#include <vector>
+namespace Geoxy
+{
+  enum class Fill : std::uint8_t
+  {
+    Ears,     
+    Delaunay, 
+  };
+  struct Mesh
+  {
+    std::vector<std::array<std::uint32_t, 3>> Triangles = {}; 
+    bool Whole = true; 
+  };
+  [[nodiscard]] GEOXY_API auto Triangulate(std::span<const std::vector<Point>> loops, Fill fill)
+      -> Mesh;
+}
+== geoxy/vector.hpp
+#include "geoxy/api.hpp"
+#include <algorithm>
+#include <cmath>
+#include <functional>
+#include <optional>
+namespace Geoxy
+{
+  struct Vector
+  {
+    double X = 0.0; 
+    double Y = 0.0; 
+    [[nodiscard]] friend constexpr auto operator==(const Vector &lhs, const Vector &rhs) -> bool
+    {
+      return std::equal_to<double>{}(lhs.X, rhs.X) && std::equal_to<double>{}(lhs.Y, rhs.Y);
+    }
+  };
+  [[nodiscard]] constexpr auto operator+(Vector lhs, Vector rhs) -> Vector
+  {
+    return {.X = lhs.X + rhs.X, .Y = lhs.Y + rhs.Y};
+  }
+  [[nodiscard]] constexpr auto operator-(Vector lhs, Vector rhs) -> Vector
+  {
+    return {.X = lhs.X - rhs.X, .Y = lhs.Y - rhs.Y};
+  }
+  [[nodiscard]] constexpr auto operator-(Vector vector) -> Vector
+  {
+    return {.X = -vector.X, .Y = -vector.Y};
+  }
+  [[nodiscard]] constexpr auto operator*(Vector lhs, double rhs) -> Vector
+  {
+    return {.X = lhs.X * rhs, .Y = lhs.Y * rhs};
+  }
+  [[nodiscard]] constexpr auto operator*(double lhs, Vector rhs) -> Vector
+  {
+    return rhs * lhs;
+  }
+  [[nodiscard]] constexpr auto operator/(Vector lhs, double rhs) -> Vector
+  {
+    return {.X = lhs.X / rhs, .Y = lhs.Y / rhs};
+  }
+  [[nodiscard]] constexpr auto Perpendicular(Vector vector) -> Vector
+  {
+    return {.X = -vector.Y, .Y = vector.X};
+  }
+  [[nodiscard]] constexpr auto Largest(Vector vector) -> double
+  {
+    const double x = vector.X < 0.0 ? -vector.X : vector.X;
+    const double y = vector.Y < 0.0 ? -vector.Y : vector.Y;
+    return std::max(x, y);
+  }
+  [[nodiscard]] constexpr auto Dot(Vector first, Vector second) -> double
+  {
+    return (first.X * second.X) + (first.Y * second.Y);
+  }
+  [[nodiscard]] constexpr auto Cross(Vector first, Vector second) -> double
+  {
+    return (first.X * second.Y) - (first.Y * second.X);
+  }
+  [[nodiscard]] inline auto Length(Vector vector) -> double
+  {
+    constexpr double Low     = 0x1.0p-500;
+    constexpr double High    = 0x1.0p500;
+    const double     largest = Largest(vector);
+    if (largest >= Low && largest <= High)
+    {
+      return std::sqrt(Dot(vector, vector));
+    }
+    if (!(largest > 0.0) || !std::isfinite(largest))
+    {
+      return largest;
+    }
+    const Vector scaled = vector / largest;
+    return largest * std::sqrt(Dot(scaled, scaled));
+  }
+  [[nodiscard]] GEOXY_API auto Unit(Vector vector) -> std::optional<Vector>;
+}
+== geoxy/version.hpp
+#include "geoxy/api.hpp"
+#include <string_view>
+namespace Geoxy
+{
+  [[nodiscard]] GEOXY_API auto Version() -> std::string_view;
+}
+== geoxy/workers.hpp
+#include "geoxy/api.hpp"
+#include <cstddef>
+#include <memory>
+namespace Geoxy
+{
+  class Workers
+  {
+  public:
+    GEOXY_API explicit Workers(std::size_t threads = 0);
+    Workers(const Workers &) = delete;
+    Workers(Workers &&) = delete;
+    auto operator=(const Workers &) -> Workers & = delete;
+    auto operator=(Workers &&) -> Workers & = delete;
+    GEOXY_API ~Workers();
+    [[nodiscard]] GEOXY_API auto Size() const -> std::size_t;
+  private:
+    friend struct Pooled;
+    struct Shared;
+    std::unique_ptr<Shared> m_Shared; 
+  };
+}
+== geoxy/xline.hpp
+#include "geoxy/point.hpp"
+#include "geoxy/vector.hpp"
+namespace Geoxy
+{
+  struct Xline
+  {
+    Point  Through = {}; 
+    Vector Way     = {}; 
+    [[nodiscard]] friend constexpr auto operator==(const Xline &lhs, const Xline &rhs) -> bool
+    {
+      return lhs.Through == rhs.Through && lhs.Way == rhs.Way;
+    }
+  };
+}

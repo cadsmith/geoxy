@@ -1,0 +1,427 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CCACHE_COMPILERCHECK: content
+  CCACHE_DEPEND: true
+
+jobs:
+  # Which files a pull request touches: docs, the site and Markdown alone
+  # need no C++ job. A job skipped by its condition still reports success,
+  # so it can be required; a workflow filtered by paths could not.
+  changes:
+    name: changes
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            code:
+              - CMakeLists.txt
+              - CMakePresets.json
+              - .clang-format
+              - Doxyfile
+              - .clang-tidy
+              - .github/workflows/ci.yml
+              - .github/actions/**
+              - include/**
+              - source/**
+              - tests/**
+              - tools/**
+              - cmake/**
+              - vendor/**
+
+  check:
+    name: check
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/llvm
+        with:
+          packages: clang-format-23
+
+      # clang-format lays out the code, and the formatter frames every comment
+      # and aligns its tags; both are checked, neither is trusted to a person.
+      - name: Format
+        env:
+          CLANG_FORMAT: clang-format-23
+        run: python3 -I tools/format/style.py --check
+
+      # Every public declaration documented, every parameter named: Doxygen
+      # fails on its first warning.
+      - name: Documentation
+        run: |
+          sudo apt-get install -y -q --no-install-recommends doxygen
+          doxygen Doxyfile
+
+      - name: CMake guidelines
+        run: |
+          status=0
+          for file in $(git ls-files 'CMakeLists.txt' '*/CMakeLists.txt' '*.cmake'); do
+            awk -v file="$file" '
+              length > 80 { print file ":" NR ": over 80 columns"; bad = 1 }
+              /^[ \t]*#/ { print file ":" NR ": comment"; bad = 1 }
+              END { exit bad }' "$file" || status=1
+          done
+          exit "$status"
+
+      - name: Public interface snapshot
+        run: >
+          cmake -DAPI_ROOT=$PWD/include
+          -DAPI_SNAPSHOT=$PWD/tests/api/snapshot.txt
+          -DAPI_CURRENT=$RUNNER_TEMP/snapshot.txt
+          -P tests/api/snapshot.cmake
+
+      - name: Pull request title
+        if: github.event_name == 'pull_request'
+        uses: amannn/action-semantic-pull-request@2252a14e810aa9b85c2d560bd7070c802206ecf6 # v6.1.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            refactor
+            docs
+            test
+            chore
+          subjectPattern: ^[a-z].*[^.]$
+          subjectPatternError: >
+            The description must start lowercase, use the imperative mood and
+            not end with a period (docs/commit.md).
+
+  build:
+    name: ${{ matrix.name }}
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.code == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-gcc
+            os: ubuntu-26.04
+            preset: release
+            cxx: g++-15
+            launcher: ccache
+            package: true
+          - name: linux-clang
+            os: ubuntu-26.04
+            preset: release
+            cxx: /usr/lib/llvm-23/bin/clang++
+            launcher: ccache
+            packages: clang-23
+          - name: macos
+            os: macos-26
+            preset: release
+            cxx: c++
+            launcher: ccache
+          - name: windows
+            os: windows-2025
+            preset: release
+            cxx: cl
+            launcher: sccache
+          - name: sanitize
+            os: ubuntu-26.04
+            preset: sanitize
+            cxx: /usr/lib/llvm-23/bin/clang++
+            launcher: ccache
+            packages: clang-23 libclang-rt-23-dev
+            target: geoxy_tests
+          - name: coverage
+            os: ubuntu-26.04
+            preset: coverage
+            cxx: /usr/lib/llvm-23/bin/clang++
+            launcher: ccache
+            packages: clang-23 libclang-rt-23-dev llvm-23
+            target: coverage
+    env:
+      CXX: ${{ matrix.cxx }}
+      CMAKE_CXX_COMPILER_LAUNCHER: ${{ matrix.launcher }}
+    steps:
+      # Coverage takes the merge's parents too, to compare it with the head.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: ${{ matrix.target == 'coverage' && 2 || 1 }}
+
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        if: runner.os == 'Windows'
+
+      - uses: ./.github/actions/llvm
+        if: matrix.packages
+        with:
+          packages: ${{ matrix.packages }}
+
+      # Only a push to main saves: a pull request can read main's cache but
+      # nobody else can read a pull request's, and one entry per job per push
+      # keeps the repository well inside its 10 GB quota.
+      - uses: ./.github/actions/ccache
+        if: runner.os != 'Windows'
+
+      - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+        if: runner.os == 'Windows'
+        with:
+          version: v0.19.0
+
+      - uses: hendrikmuhs/ccache-action@dbeefd73e8e2ffc1bbc412570072735eb4db3607 # v1.2.25
+        with:
+          key: ${{ matrix.name }}
+          variant: ${{ matrix.launcher }}
+          install: no
+          max-size: 300M
+          save: ${{ github.event_name == 'push' }}
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+
+      # The release jobs build everything, the headers-alone check included;
+      # sanitize builds the tests alone, and coverage the target that runs
+      # them and gates the result.
+      - name: Build
+        run: >
+          cmake --build --preset ${{ matrix.preset }}
+          ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
+
+      - name: Test
+        if: matrix.target != 'coverage'
+        run: ctest --preset ${{ matrix.preset }} --parallel 4
+
+      # Every program in the docs built against the library and held to the
+      # output written under it.
+      - name: Documentation programs
+        if: matrix.package
+        run: python3 -I tools/docs/examples.py
+
+      # The benchmarks build and run, briefly: a smoke test, not a measure,
+      # since a shared runner's timings are noise.
+      - name: Benchmark
+        if: matrix.package
+        run: |
+          cmake --preset bench
+          cmake --build --preset bench
+          {
+            echo '## Benchmark'
+            echo '```'
+            build/bench/bin/geoxy_bench --benchmark_min_time=0.05s
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The installed package and the subdirectory, each used the way a
+      # consumer would.
+      - name: Install and consume
+        if: matrix.package
+        run: |
+          cmake --install build/release --prefix "$RUNNER_TEMP/geoxy"
+          cmake -S tests/package -B "$RUNNER_TEMP/consumer" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/geoxy"
+          cmake --build "$RUNNER_TEMP/consumer"
+          "$RUNNER_TEMP/consumer/geoxy_package"
+          cmake -S tests/package -B "$RUNNER_TEMP/subdirectory" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGEOXY_PACKAGE_SOURCE="$GITHUB_WORKSPACE"
+          cmake --build "$RUNNER_TEMP/subdirectory"
+          "$RUNNER_TEMP/subdirectory/geoxy_package"
+
+      # The figure the gate measured, published so that it is shown rather
+      # than claimed.
+      - name: Export the coverage
+        if: matrix.target == 'coverage'
+        run: |
+          /usr/lib/llvm-23/bin/llvm-cov export build/coverage/bin/geoxy_tests \
+            -instr-profile=build/coverage/tests/geoxy_tests.profdata \
+            -format=lcov include source \
+            | sed "s#^SF:$GITHUB_WORKSPACE/#SF:#" > coverage.lcov
+
+      - uses: coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329 # v2.3.8
+        if: matrix.target == 'coverage'
+        with:
+          file: coverage.lcov
+          format: lcov
+          fail-on-error: false
+
+      # main's report, kept for the pull requests that build no code, and
+      # kept first, so a Codacy outage does not lose it.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: matrix.target == 'coverage' && github.event_name == 'push'
+        with:
+          name: coverage
+          path: coverage.lcov
+          retention-days: 90
+
+      # Codacy files a pull request's report under its head. The report is
+      # the merge's, whose lines are the head's only while main has not
+      # changed the library since the branch left it.
+      - name: Match the head
+        id: head
+        if: matrix.target == 'coverage'
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" != pull_request ] || git diff --quiet HEAD^2 HEAD -- include source; then
+            echo "same=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::main changed the library since this branch left it: update it from main for Codacy's coverage"
+          fi
+
+      # Codacy's coverage checks need a report for a pull request's head and
+      # for its base on main.
+      - uses: ./.github/actions/codacy
+        if: matrix.target == 'coverage' && steps.head.outputs.same == 'true'
+        with:
+          report: coverage.lcov
+          commit: ${{ github.event.pull_request.head.sha || github.sha }}
+          token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+
+  tidy:
+    name: tidy
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    env:
+      CXX: /usr/lib/llvm-23/bin/clang++
+    steps:
+      # The whole history, so a pull request can be diffed from its merge
+      # base with main.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      # The same major as the Homebrew LLVM used locally: .clang-tidy names
+      # checks that older releases do not have.
+      - uses: ./.github/actions/llvm
+        with:
+          packages: clang-23 clang-tidy-23 clangd-23
+
+      # Configure alone: clang-tidy reads the compile commands and parses
+      # each source itself, so nothing is compiled or linked here.
+      - name: Configure
+        run: cmake --preset tidy -DGEOXY_CLANG_TIDY=/usr/lib/llvm-23/bin/clang-tidy
+
+      # A pull request checks the sources its change reaches, a changed
+      # source or one that includes a changed header; a push to main checks
+      # every source.
+      - name: Tidy
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            base="origin/$GITHUB_BASE_REF"
+          else
+            base=""
+          fi
+          python3 tools/tidy/touched.py build/tidy/compile_commands.json \
+            ${base:+"$base"} > "$RUNNER_TEMP/touched"
+          if [ ! -s "$RUNNER_TEMP/touched" ]; then
+            echo "the change reaches no source of the library"
+            exit 0
+          fi
+          echo "checking $(wc -l < "$RUNNER_TEMP/touched") sources"
+          xargs run-clang-tidy-23 -p build/tidy -j "$(nproc)" -quiet \
+            < "$RUNNER_TEMP/touched"
+
+      # What an editor running clangd would mark, the include cleaner's
+      # findings too, on every file, tests included.
+      - name: Editor
+        env:
+          CLANGD: clangd-23
+        run: |
+          cmake --preset debug
+          python3 -I tools/format/editor.py
+
+  # A pull request that builds no code covers what its base on main covers:
+  # main's report goes to Codacy again, under the head, so Codacy's coverage
+  # checks report on docs and the site too, without a build.
+  codacy:
+    name: codacy
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.code != 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - id: token
+        env:
+          TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+        run: echo "set=${{ env.TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.token.outputs.set == 'true'
+        with:
+          persist-credentials: false
+
+      - name: Fetch main's report
+        if: steps.token.outputs.set == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          base=$(gh api "repos/$GITHUB_REPOSITORY/compare/$BASE...$HEAD" -q .merge_base_commit.sha)
+          run=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --event push \
+            --commit "$base" -L 1 --json databaseId -q '.[0].databaseId')
+          # A base from before main kept its report, or past the report's 90
+          # days, has none: bring the branch up to date with main, whose CI
+          # keeps one, and this job finds it.
+          if [ -z "$run" ]; then
+            echo "::error::main's CI has not run on $base: update this branch from main"
+            exit 1
+          fi
+          gh run download "$run" -R "$GITHUB_REPOSITORY" -n coverage -D "$RUNNER_TEMP/coverage" || {
+            echo "::error::main's run $run on $base kept no coverage: update this branch from main, or rerun once that run has finished"
+            exit 1
+          }
+
+      - uses: ./.github/actions/codacy
+        if: steps.token.outputs.set == 'true'
+        with:
+          report: ${{ runner.temp }}/coverage/coverage.lcov
+          commit: ${{ github.event.pull_request.head.sha }}
+          token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+
+  # The one check to require: green when every job passed or was skipped
+  # by the changes gate, whose skipped matrix jobs report no names of
+  # their own.
+  ok:
+    name: ok
+    needs: [changes, check, build, tidy, codacy]
+    if: always()
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - run: |
+          echo '${{ toJSON(needs) }}' | jq -e '
+            to_entries
+            | all(.value.result == "success" or .value.result == "skipped")'

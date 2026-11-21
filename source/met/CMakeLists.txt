@@ -1,0 +1,16 @@
+target_sources(geoxy
+  PRIVATE
+    band.cpp
+    ellipse.cpp
+    floor.cpp
+    judge.cpp
+    linear.cpp
+    overlap.cpp
+    parts.cpp
+    reach.cpp
+    round.cpp
+    scale.cpp
+    slight.cpp
+    solve.cpp
+    thorough.cpp
+)

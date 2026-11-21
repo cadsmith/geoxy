@@ -1,0 +1,87 @@
+target_sources(geoxy_tests
+  PRIVATE
+    angle.cpp
+    arc.cpp
+    area.cpp
+    arranged.cpp
+    arrangement.cpp
+    at.cpp
+    axis.cpp
+    bits.cpp
+    box.cpp
+    braid.cpp
+    chamfer.cpp
+    clip.cpp
+    cloud.cpp
+    construct.cpp
+    contain.cpp
+    crossing.cpp
+    curvature.cpp
+    dash.cpp
+    derivative.cpp
+    direct.cpp
+    divide.cpp
+    domain.cpp
+    eased.cpp
+    ellipse.cpp
+    ends.cpp
+    expansion.cpp
+    extents.cpp
+    fillet.cpp
+    fit.cpp
+    flatten.cpp
+    graze.cpp
+    grid.cpp
+    inertia.cpp
+    intersect.cpp
+    join.cpp
+    lace.cpp
+    length.cpp
+    line.cpp
+    loop.cpp
+    matrix.cpp
+    nearest.cpp
+    offset.cpp
+    orient.cpp
+    outline.cpp
+    part.cpp
+    pieced.cpp
+    piecewise.cpp
+    place.cpp
+    point.cpp
+    polish.cpp
+    polyline.cpp
+    prepared.cpp
+    rational.cpp
+    reference.cpp
+    region.cpp
+    reverse.cpp
+    ring.cpp
+    scratch.cpp
+    secular.cpp
+    segment.cpp
+    slanted.cpp
+    spline.cpp
+    strand.cpp
+    sure.cpp
+    swift.cpp
+    tangents.cpp
+    text.cpp
+    tolerance.cpp
+    touch.cpp
+    transform.cpp
+    tree.cpp
+    triangulate.cpp
+    trigo.cpp
+    twin.cpp
+    vault.cpp
+    vector.cpp
+    version.cpp
+    workers.cpp
+)
+
+add_subdirectory(bezier)
+add_subdirectory(crossings)
+add_subdirectory(exact)
+add_subdirectory(kernel)
+add_subdirectory(space)
