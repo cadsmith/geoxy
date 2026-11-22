@@ -150,6 +150,25 @@ namespace Geoxy::Exact
     const double high   = scaled - big;
     return {.Big = high, .Small = value - high};
   }
+
+  /**
+   *  What a product leaves out, by its factors split as Dekker and Shewchuk split them.
+   *
+   *  @pre            Neither factor is past 2^996.
+   *  @param  first   One factor.
+   *  @param  second  The other.
+   *  @param  product Their product, rounded.
+   *  @return         The product's roundoff, exactly, clear of underflow.
+   */
+  constexpr auto Roundoff(double first, double second, double product) -> double
+  {
+    const Two    firstHalves  = Split(first);
+    const Two    secondHalves = Split(second);
+    const double error1       = product - (firstHalves.Big * secondHalves.Big);
+    const double error2       = error1 - (firstHalves.Small * secondHalves.Big);
+    const double error3       = error2 - (firstHalves.Big * secondHalves.Small);
+    return (firstHalves.Small * secondHalves.Small) - error3;
+  }
 #endif
 
   /**
@@ -165,12 +184,25 @@ namespace Geoxy::Exact
 #if GEOXY_EXACT_FMA
     return {.Big = product, .Small = std::fma(first, second, -product)};
 #else
-    const Two    firstHalves  = Split(first);
-    const Two    secondHalves = Split(second);
-    const double error1       = product - (firstHalves.Big * secondHalves.Big);
-    const double error2       = error1 - (firstHalves.Small * secondHalves.Big);
-    const double error3       = error2 - (firstHalves.Big * secondHalves.Small);
-    return {.Big = product, .Small = (firstHalves.Small * secondHalves.Small) - error3};
+    const double small = Roundoff(first, second, product);
+    if (std::isfinite(small))
+    {
+      return {.Big = product, .Small = small};
+    }
+    if (!std::isfinite(product))
+    {
+      return {.Big = product, .Small = -product};
+    }
+    /**
+     *  A factor past 2^996 overflows as it is split. Scaled down by a power of two it splits, the
+     *  product and its roundoff scaled alike, exactly; a product that is a double has only one such
+     *  factor.
+     */
+    constexpr double Far  = 0x1p900;
+    constexpr double Down = 0x1p-64;
+    const double     one  = std::abs(first) > Far ? first * Down : first;
+    const double     two  = std::abs(first) > Far ? second : second * Down;
+    return {.Big = product, .Small = Roundoff(one, two, one * two) / Down};
 #endif
   }
 

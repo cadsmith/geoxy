@@ -157,6 +157,25 @@ namespace Geoxy::Exact
     CHECK(exact == Count);
   }
 
+  /**
+   *  A machine with no fused multiply-add splits each factor by 2^27 + 1, which overflows past
+   *  2^996: the roundoff there must still be the exact one, as the fused product gives it, and a
+   *  product past every double leave what the fused product leaves.
+   */
+  TEST_CASE("two: a product of a factor past 2^996 keeps its exact roundoff")
+  {
+    const Two product = TwoProduct(0x1.0000000000001p1000, 0x1.0000000000001p10);
+    CHECK(Bits(product.Big)   == Bits(0x1.0000000000002p1010));
+    CHECK(Bits(product.Small) == Bits(0x1p906));
+    const Two turns = TwoProduct(360e300, 0x1.6c16c16c16c17p-9);
+    CHECK(Bits(turns.Small) == Bits(std::fma(360e300, 0x1.6c16c16c16c17p-9, -turns.Big)));
+    const Two swapped = TwoProduct(0x1.0000000000001p10, 0x1.0000000000001p1000);
+    CHECK(Bits(swapped.Small) == Bits(0x1p906));
+    const Two past = TwoProduct(0x1p1000, 0x1p1000);
+    CHECK(std::isinf(past.Big));
+    CHECK(Bits(past.Small) == Bits(std::fma(0x1p1000, 0x1p1000, -past.Big)));
+  }
+
   TEST_CASE("two: the roundoff of a difference that is exact is zero")
   {
     CHECK(IsZero(TwoDiff(1.5, 0.25).Small));
