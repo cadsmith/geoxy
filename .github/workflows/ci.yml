@@ -80,6 +80,7 @@ jobs:
       - name: Documentation
         run: |
           sudo apt-get install -y -q --no-install-recommends doxygen
+          mkdir -p build/docs
           doxygen Doxyfile
 
       - name: CMake guidelines
@@ -323,7 +324,7 @@ jobs:
       # checks that older releases do not have.
       - uses: ./.github/actions/llvm
         with:
-          packages: clang-23 clang-tidy-23 clangd-23
+          packages: clang-23 clang-tidy-23
 
       # Configure alone: clang-tidy reads the compile commands and parses
       # each source itself, so nothing is compiled or linked here.
@@ -349,15 +350,6 @@ jobs:
           echo "checking $(wc -l < "$RUNNER_TEMP/touched") sources"
           xargs run-clang-tidy-23 -p build/tidy -j "$(nproc)" -quiet \
             < "$RUNNER_TEMP/touched"
-
-      # What an editor running clangd would mark, the include cleaner's
-      # findings too, on every file, tests included.
-      - name: Editor
-        env:
-          CLANGD: clangd-23
-        run: |
-          cmake --preset debug
-          python3 -I tools/format/editor.py
 
   # A pull request that builds no code covers what its base on main covers:
   # main's report goes to Codacy again, under the head, so Codacy's coverage

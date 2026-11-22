@@ -61,14 +61,14 @@ namespace Geoxy::Swift
      */
     auto Beyond(const Ring &ring, std::size_t quarter) -> bool
     {
-      constexpr double Whole  = 2.0 * std::numbers::pi;
-      constexpr double Margin = 0x1p-20;
-      const double     least  = std::min(ring.Start, ring.Start + ring.Sweep);
-      const double     shift  = least - (static_cast<double>(quarter) * std::numbers::pi / 2.0);
-      const double     from   = shift - (Whole * std::floor(shift / Whole));
+      constexpr double Whole = 2.0 * std::numbers::pi;
+      constexpr double Verge = 0x1p-20;
+      const double     least = std::min(ring.Start, ring.Start + ring.Sweep);
+      const double     shift = least - (static_cast<double>(quarter) * std::numbers::pi / 2.0);
+      const double     from  = shift - (Whole * std::floor(shift / Whole));
       return !ring.Whole
-          && from > (std::numbers::pi / 2.0) + Margin
-          && from + std::abs(ring.Sweep) < Whole - Margin;
+          && from > (std::numbers::pi / 2.0) + Verge
+          && from + std::abs(ring.Sweep) < Whole - Verge;
     }
 
     /**

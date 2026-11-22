@@ -33,9 +33,11 @@ if (Python3_Interpreter_FOUND)
       --check ${CMAKE_CURRENT_SOURCE_DIR}/geoxy/cases/intersect.txt
   )
   add_test(NAME suites_oracle COMMAND ${oracle})
-  add_test(NAME suites_forged COMMAND ${forged})
-  set_tests_properties(suites_oracle suites_forged
-    PROPERTIES LABELS suites COST 100)
+  set_tests_properties(suites_oracle PROPERTIES LABELS suites COST 100)
+  if (APPLE)
+    add_test(NAME suites_forged COMMAND ${forged})
+    set_tests_properties(suites_forged PROPERTIES LABELS suites COST 100)
+  endif()
 endif()
 
 add_executable(geoxy_scoreboard

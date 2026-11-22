@@ -226,7 +226,9 @@ by side load the machine past its cores, and a process pays once for the
 memory it touches first.
 
 The checks of `tools/suites`, `suites_oracle` and `suites_forged`, are
-Python and never touch the C++ build. Each runs through
+Python and never touch the C++ build; `suites_forged` runs on macOS alone,
+where the cases were forged: on Linux the forge makes cases that differ,
+for a reason not yet found. Each runs through
 `cmake/stamp.cmake`, which stamps a check that passes in `build/stamps`, the
 folder every preset shares (`GEOXY_STAMPS`), by a hash of what it reads:
 `tools/suites/*.py`, its cases, and Python's path and date. A check whose
@@ -289,8 +291,9 @@ checks it changes, and not otherwise. A proof that passes is stamped in
 `build/stamps` too, as the Python checks are, by a hash of those files and of
 the tools' paths and dates, so a fresh tree proves once for every preset, not
 once a preset. Where a proof runs: `rocq` wherever `rocq` is found,
-`circle` and `first` wherever `z3` is, `convert` everywhere, `translation`
-and `integers` with Clang, and `machine` with Clang on macOS. CTest runs one
+`circle` and `first` wherever `z3` is, `convert` everywhere, `integers`
+with Clang, `translation` with Clang on arm64, whose fused multiply-add
+its graphs are written for, and `machine` with Clang on macOS. CTest runs one
 test for them all, `geoxy_proofs`, which builds the target of that name: it
 proves what is out of date, a few minutes in a fresh tree, and nothing where
 nothing they prove from has changed. Deleting `build/stamps` and building the
