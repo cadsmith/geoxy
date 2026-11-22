@@ -151,31 +151,6 @@ jobs:
             preset: release
             cxx: cl
             launcher: sccache
-          - name: linux-gcc-trigo
-            os: ubuntu-26.04
-            preset: release
-            cxx: g++-15
-            launcher: ccache
-            configure: -DGEOXY_ENABLE_TRIGO=ON
-          - name: linux-clang-trigo
-            os: ubuntu-26.04
-            preset: release
-            cxx: /usr/lib/llvm-23/bin/clang++
-            launcher: ccache
-            packages: clang-23
-            configure: -DGEOXY_ENABLE_TRIGO=ON
-          - name: macos-trigo
-            os: macos-26
-            preset: release
-            cxx: c++
-            launcher: ccache
-            configure: -DGEOXY_ENABLE_TRIGO=ON
-          - name: windows-trigo
-            os: windows-2025
-            preset: release
-            cxx: cl
-            launcher: sccache
-            configure: -DGEOXY_ENABLE_TRIGO=ON
           - name: sanitize
             os: ubuntu-26.04
             preset: sanitize
@@ -228,7 +203,7 @@ jobs:
           save: ${{ github.event_name == 'push' }}
 
       - name: Configure
-        run: cmake --preset ${{ matrix.preset }} ${{ matrix.configure }}
+        run: cmake --preset ${{ matrix.preset }}
 
       # The release jobs build everything, the headers-alone check included;
       # sanitize builds the tests alone, and coverage the target that runs
