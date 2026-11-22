@@ -157,7 +157,6 @@ jobs:
             cxx: /usr/lib/llvm-23/bin/clang++
             launcher: ccache
             packages: clang-23 libclang-rt-23-dev
-            target: geoxy_tests
           - name: coverage
             os: ubuntu-26.04
             preset: coverage
@@ -205,9 +204,9 @@ jobs:
       - name: Configure
         run: cmake --preset ${{ matrix.preset }}
 
-      # The release jobs build everything, the headers-alone check included;
-      # sanitize builds the tests alone, and coverage the target that runs
-      # them and gates the result.
+      # Every job builds everything, the headers-alone check included, but
+      # coverage, which builds the target that runs the tests and gates the
+      # result.
       - name: Build
         run: >
           cmake --build --preset ${{ matrix.preset }}
@@ -253,6 +252,17 @@ jobs:
             -DGEOXY_PACKAGE_SOURCE="$GITHUB_WORKSPACE"
           cmake --build "$RUNNER_TEMP/subdirectory"
           "$RUNNER_TEMP/subdirectory/geoxy_package"
+
+      # Where the gate fails, the branches no test took, by file and line: a
+      # runner's standard library takes some a developer's does not.
+      - name: Show what is not covered
+        if: failure() && matrix.target == 'coverage'
+        run: |
+          /usr/lib/llvm-23/bin/llvm-cov show build/coverage/bin/geoxy_tests \
+            -instr-profile=build/coverage/tests/geoxy_tests.profdata \
+            -show-branches=count include source \
+            | grep -E '^/|Branch \(.*(True: 0|False: 0)' \
+            | grep -B1 'Branch (' | grep -v '^--' | head -80
 
       # The figure the gate measured, published so that it is shown rather
       # than claimed.

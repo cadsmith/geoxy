@@ -30,6 +30,7 @@ namespace Geoxy::Exact
             .Y = TwoDiffTail(end.Y, start.Y, rounded.Y)};
   }
 
+#if GEOXY_EXACT_FMA
   /**
    *  Whether a difference was exact: both components of its roundoff zero, of either sign, and
    *  neither NaN, as an overflow on the way to a roundoff leaves it near the top of the doubles.
@@ -41,6 +42,7 @@ namespace Geoxy::Exact
   {
     return std::fpclassify(roundoff.X) == FP_ZERO && std::fpclassify(roundoff.Y) == FP_ZERO;
   }
+#endif
 
   /**
    *  Whether both components of a displacement are zero, of either sign.
