@@ -517,9 +517,8 @@ namespace Geoxy
     void Snagging(const Arranged &arranged, Ferrying &ferrying)
     {
       List<Snag> &snags = ferrying.Snags;
-      std::ranges::sort(
-          snags, [](const Snag &lhs, const Snag &rhs) -> bool
-          { return lhs.Vertex < rhs.Vertex || (lhs.Vertex == rhs.Vertex && lhs.Out < rhs.Out); });
+      std::ranges::sort(snags, {}, [](const Snag &snag) -> std::pair<std::uint32_t, std::uint32_t>
+                        { return {snag.Vertex, snag.Out}; });
       List<Spoke> spokes;
       for (std::size_t start = 0; start < snags.size();)
       {
