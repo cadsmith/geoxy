@@ -151,6 +151,16 @@ jobs:
             preset: release
             cxx: cl
             launcher: sccache
+          - name: windows-clang-cl
+            os: windows-2025
+            preset: release
+            cxx: clang-cl
+            launcher: sccache
+          - name: windows-debug
+            os: windows-2025
+            preset: debug
+            cxx: cl
+            launcher: sccache
           - name: sanitize
             os: ubuntu-26.04
             preset: sanitize
