@@ -130,8 +130,14 @@ namespace Geoxy
       switch (mixer.Pick(5))
       {
       case 0:
-        return {.Start = middle + (across * scale * mixer.Unit()) + (way * mixer.Unit()),
-                .End   = middle + (across * scale * mixer.Unit()) + (way * mixer.Unit())};
+      {
+        const double startAcross = mixer.Unit();
+        const double startAlong  = mixer.Unit();
+        const double endAcross   = mixer.Unit();
+        const double endAlong    = mixer.Unit();
+        return {.Start = middle + (across * scale * startAcross) + (way * startAlong),
+                .End   = middle + (across * scale * endAcross) + (way * endAlong)};
+      }
       case 1:
       {
         const double slopeFraction = mixer.Unit();
@@ -975,6 +981,32 @@ namespace Geoxy
     CHECK(Intersect(before, quarter, tolerance).Hits.size() == 1);
   }
 
+  /**
+   *  A ray stopping 9.157e-10 from an arc's circle at half a million, a tolerance of 8.48e-10 asked
+   *  and 16 steps of a double, 9.31e-10, used: its start is a hit at an end, as the thorough way
+   *  finds it. The arc's point there is rounded by some 3e-11, more than the end lies inside the
+   *  tolerance, so the direct way leaves it to the thorough way. Found by MSVC's order of drawing.
+   */
+  TEST_CASE("direct: an end within rounding of the tolerance's edge is the thorough way's")
+  {
+    const Arc       arc       = {.Center = {.X = -502185.49816954485, .Y = 502185.49816954485},
+                                 .Radius = 0.11378029431686723,
+                                 .Start  = Degrees(216),
+                                 .Sweep  = Degrees(-211)};
+    const Ray       ray       = {.Start = {.X = -502185.4205489073, .Y = 502185.5813620458},
+                                 .Way   = {.X = 0.06794078060192987, .Y = 0.06348377745598555}};
+    const Tolerance tolerance = {.Length = 0x1.d20b493052bcap-31, .Radians = 1e-9};
+    for (const bool swapped : {false, true})
+    {
+      const Curve         one   = swapped ? Curve{ray} : Curve{arc};
+      const Curve         two   = swapped ? Curve{arc} : Curve{ray};
+      const Intersections found = Intersect(one, two, tolerance);
+      REQUIRE(found.Hits.size()     == 1);
+      CHECK(found.Hits.front().Kind == Contact::End);
+      CHECK(Agrees({one, two}, tolerance));
+    }
+  }
+
   TEST_CASE("direct: lines stopping short of circles, within the tolerance and past it")
   {
     Mixer     mixer;
@@ -995,9 +1027,11 @@ namespace Geoxy
       const Vector way    = Vector{.X = (toward.X * std::cos(tilt)) - (toward.Y * std::sin(tilt)),
                                    .Y = (toward.X * std::sin(tilt)) + (toward.Y * std::cos(tilt))}
                           * radius;
-      const double gap    = near * ((mixer.Unit() * 6.0) - 0.5) * (mixer.Pick(2) == 0 ? 1.0 : -1.0);
-      const Point  end    = centre + (toward * (radius + gap));
-      const Point  from   = end + (way * (mixer.Pick(2) == 0 ? 1.0 : -1.0) * (0.2 + mixer.Unit()));
+      const double gapFraction = mixer.Unit();
+      const double gap = near * ((gapFraction * 6.0) - 0.5) * (mixer.Pick(2) == 0 ? 1.0 : -1.0);
+      const Point  end = centre + (toward * (radius + gap));
+      const double fromSide = mixer.Pick(2) == 0 ? 1.0 : -1.0;
+      const Point  from     = end + (way * fromSide * (0.2 + mixer.Unit()));
       const Line   line =
           mixer.Pick(2) == 0 ? Line{.Start = from, .End = end} : Line{.Start = end, .End = from};
       const Curve other =

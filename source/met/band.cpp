@@ -387,9 +387,18 @@ namespace Geoxy::Met
         const Curve  curve = arc;
         if (const std::optional<double> along = Facing(arc, end - round->Center))
         {
-          const Point here  = At(*straight.Shape, place);
-          const Point there = At(curve, *along);
-          if (Distance(here, there) <= tolerance.Length)
+          const Point  here  = At(*straight.Shape, place);
+          const Point  there = At(curve, *along);
+          const double apart = Distance(here, there);
+          /**
+           *  The arc's point is rounded once at its coordinates' size: an end that far from the
+           *  tolerance's edge or nearer is left to the thorough way, which may tell it otherwise.
+           */
+          if (std::abs(apart - tolerance.Length) <= 4.0 * std::max(Grain(here), Grain(there)))
+          {
+            return std::nullopt;
+          }
+          if (apart <= tolerance.Length)
           {
             near.Ready.at(near.Made) = {.At     = Midpoint(here, there),
                                         .First  = {.At = here, .Along = place},
