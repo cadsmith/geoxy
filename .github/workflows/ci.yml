@@ -156,11 +156,13 @@ jobs:
             preset: release
             cxx: clang-cl
             launcher: sccache
+            configure: -DCMAKE_C_COMPILER=clang-cl
           - name: windows-debug
             os: windows-2025
             preset: debug
             cxx: cl
             launcher: sccache
+            configure: -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
           - name: sanitize
             os: ubuntu-26.04
             preset: sanitize
@@ -212,7 +214,7 @@ jobs:
           save: ${{ github.event_name == 'push' }}
 
       - name: Configure
-        run: cmake --preset ${{ matrix.preset }}
+        run: cmake --preset ${{ matrix.preset }} ${{ matrix.configure }}
 
       # Every job builds everything, the headers-alone check included, but
       # coverage, which builds the target that runs the tests and gates the
