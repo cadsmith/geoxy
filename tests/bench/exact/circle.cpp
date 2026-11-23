@@ -27,8 +27,8 @@ namespace Geoxy::Exact
   {
     struct Case
     {
-      Triangle Circle;
-      Point    Point;
+      Triangle     Circle;
+      Geoxy::Point Point;
     };
 
     constexpr std::size_t CircleCount = 65'536;
