@@ -3570,7 +3570,8 @@ namespace Geoxy
       };
       const auto slight = [&draws]() -> double
       {
-        return (draws.Next() % 2 == 0 ? 1.0 : -1.0) * std::pow(10.0, -10.0 + draws.Near(0.0, 7.0));
+        const double sign = draws.Next() % 2 == 0 ? 1.0 : -1.0;
+        return sign * std::pow(10.0, -10.0 + draws.Near(0.0, 7.0));
       };
       const auto strung = [&draws, &spot, &slight]() -> Polyline
       {

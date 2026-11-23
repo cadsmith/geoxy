@@ -264,7 +264,8 @@ namespace Geoxy
       const double bearing = draws.Near(0.0, Pi);
       const Point  end     = Toward(start, Heading(bearing, draws.Near(3.0, 2.9) * scale), grid);
       const double place   = draws.Next() % 4 == 0 ? 1.0 : draws.Near(0.5, 0.5);
-      const double aside   = length * draws.Near(0.0, 6.0) * static_cast<double>(draws.Next() % 2);
+      const double asideFraction = draws.Near(0.0, 6.0);
+      const double aside         = length * asideFraction * static_cast<double>(draws.Next() % 2);
       const Point  meeting =
           Toward(Lerp(start, end, place), Heading(draws.Near(0.0, Pi), aside), grid);
       const double turn  = draws.Near(0.0, Pi);

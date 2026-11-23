@@ -314,7 +314,8 @@ namespace Geoxy
       {
         return Circle(centre, radius);
       }
-      const double sweep = draws.Near(3.25, 2.75) * (draws.Next() % 2 == 0 ? 1.0 : -1.0);
+      const double sweepSize = draws.Near(3.25, 2.75);
+      const double sweep     = sweepSize * (draws.Next() % 2 == 0 ? 1.0 : -1.0);
       return {.Center = centre,
               .Radius = radius,
               .Start  = Radians(draws.Near(Pi, Pi)),
@@ -483,8 +484,9 @@ namespace Geoxy
        *  point a line at a slight or a plain angle, another line, and another arc, each of their
        *  own ends set as near.
        */
-      const Point  base = {.X = draws.Near(0, 3) * size * (pick(3) == 0 ? 1e4 : 1.0),
-                           .Y = draws.Near(0, 3) * size};
+      const double baseX = draws.Near(0, 3);
+      const Point  base  = {.X = baseX * size * (pick(3) == 0 ? 1e4 : 1.0),
+                            .Y = draws.Near(0, 3) * size};
       const double radius =
           pick(6) == 0 ? length * draws.Near(4500, 4450) : size * draws.Near(1.6, 1.4);
       const double start = draws.Near(0, Pi);
@@ -509,9 +511,8 @@ namespace Geoxy
       };
       const double reach =
           pick(6) == 0 ? length * draws.Near(4500, 4450) : size * draws.Near(1.6, 1.4);
-      const double bearing = turn
-                           + (pick(3) == 0 ? draws.Near(0, 0.3) : draws.Near(Pi / 2, 1.1))
-                           + (pick(2) == 0 ? 0.0 : Pi);
+      const double swing   = pick(3) == 0 ? draws.Near(0, 0.3) : draws.Near(Pi / 2, 1.1);
+      const double bearing = turn + swing + (pick(2) == 0 ? 0.0 : Pi);
       const double round2  = pick(5) == 0 ? 2 * Pi : draws.Near(3.2, 3.0) * either();
       const double start2  = pick(3) == 0
                                ? bearing - (round2 * draws.Near(0.5, 0.45))
@@ -815,9 +816,16 @@ namespace Geoxy
       const Point   offset  = place.Offset;
       const Vector  centre  = {.X = draws.Near(0, 1), .Y = draws.Near(0, 1)};
       const double  heading = draws.Near(Pi, Pi);
-      const double  turn   = kind == 2 ? std::pow(10.0, draws.Near(-6, 3)) * (pick(2) == 0 ? 1 : -1)
-                                       : draws.Near(1.55, 1.25);
-      const auto    stroke = [&](double angle) -> Line
+      const double  turn    = [&draws, &pick, kind]() -> double
+      {
+        if (kind != 2)
+        {
+          return draws.Near(1.55, 1.25);
+        }
+        const double tiny = std::pow(10.0, draws.Near(-6, 3));
+        return tiny * (pick(2) == 0 ? 1 : -1);
+      }();
+      const auto stroke = [&](double angle) -> Line
       {
         const Vector along = {.X = std::cos(angle), .Y = std::sin(angle)};
         Point        start = offset + ((centre - (along * draws.Near(0.55, 0.45))) * scale);
@@ -1555,12 +1563,13 @@ namespace Geoxy
     const int rounds = Rounds(1600);
     for (int round = 0; round < rounds; ++round)
     {
-      const double    scale  = std::ldexp(1.0, static_cast<int>(draws.Next() % 81) - 40);
-      const bool      far    = draws.Next() % 3 == 0;
-      const Point     offset = {.X = scale * (far ? 1e7 : 50) * draws.Near(0, 1),
-                                .Y = scale * (far ? -3e6 : 50) * draws.Near(0, 1)};
-      const double    length = scale * (draws.Next() % 2 == 0 ? 1e-6 : 1e-3) * draws.Near(1, 0.5);
-      const Tolerance tolerance      = {.Length = length, .Radians = 1e-9};
+      const double         scale     = std::ldexp(1.0, static_cast<int>(draws.Next() % 81) - 40);
+      const bool           far       = draws.Next() % 3 == 0;
+      const Point          offset    = {.X = scale * (far ? 1e7 : 50) * draws.Near(0, 1),
+                                        .Y = scale * (far ? -3e6 : 50) * draws.Near(0, 1)};
+      const double         unit      = scale * (draws.Next() % 2 == 0 ? 1e-6 : 1e-3);
+      const double         length    = unit * draws.Near(1, 0.5);
+      const Tolerance      tolerance = {.Length = length, .Radians = 1e-9};
       constexpr std::array Fractions = {0.0, 0.0, 0.0, 0.25, 0.5, 1.0, 2.0, 4.0, 5.0, 70.0};
       const auto           spot      = [&offset, scale](double x, double y) -> Point
       {
@@ -1575,21 +1584,21 @@ namespace Geoxy
         const double fraction = Fractions.at(draws.Next() % Fractions.size());
         return fraction * length * (draws.Next() % 2 == 0 ? 1.0 : -1.0);
       };
-      const double y      = grid(5);
-      const double x      = grid(5);
-      Point        start  = spot(grid(8), y);
-      Point        bottom = spot(x, grid(8));
-      Point        top    = spot(x, grid(8));
-      start.X             = draws.Next() % 3 == 0 ? bottom.X + nudge() : start.X;
-      top.Y               = draws.Next() % 3 == 0 ? start.Y + nudge() : top.Y;
-      const Point  centre = spot(grid(5), grid(5));
-      const double turn   = 90.0 * static_cast<double>(draws.Next() % 4);
-      const double sweep =
-          (draws.Next() % 2 == 0 ? 90.0 : 270.0) * (draws.Next() % 2 == 0 ? 1 : -1);
-      const double             radius = std::round(draws.Near(5, 4)) + 1;
-      const Point              cut    = centre + (Direction(Degrees(turn)) * (radius * scale));
-      const Point              stop   = cut + (Direction(Degrees(turn)) * (scale * grid(6)));
-      const std::vector<Curve> curves = {
+      const double y                     = grid(5);
+      const double x                     = grid(5);
+      Point        start                 = spot(grid(8), y);
+      Point        bottom                = spot(x, grid(8));
+      Point        top                   = spot(x, grid(8));
+      start.X                            = draws.Next() % 3 == 0 ? bottom.X + nudge() : start.X;
+      top.Y                              = draws.Next() % 3 == 0 ? start.Y + nudge() : top.Y;
+      const Point              centre    = spot(grid(5), grid(5));
+      const double             turn      = 90.0 * static_cast<double>(draws.Next() % 4);
+      const double             sweepSize = draws.Next() % 2 == 0 ? 90.0 : 270.0;
+      const double             sweep     = sweepSize * (draws.Next() % 2 == 0 ? 1 : -1);
+      const double             radius    = std::round(draws.Near(5, 4)) + 1;
+      const Point              cut       = centre + (Direction(Degrees(turn)) * (radius * scale));
+      const Point              stop      = cut + (Direction(Degrees(turn)) * (scale * grid(6)));
+      const std::vector<Curve> curves    = {
           Stroke(start, spot(grid(8), y)),
           Stroke(bottom, top),
           Arc{.Center = centre,

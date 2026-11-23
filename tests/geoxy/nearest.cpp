@@ -462,9 +462,8 @@ namespace Geoxy
     {
       const double  major  = draws.Near(2, 1.5);
       const double  minor  = major * draws.Near(0.5, 0.45);
-      const Matrix  map    = Translation({.X = draws.Near(0, 5), .Y = draws.Near(0, 5)})
-                           * Rotation(Degrees(draws.Near(0, 180)))
-                           * Scaling(major, minor);
+      const Matrix  moved  = Translation({.X = draws.Near(0, 5), .Y = draws.Near(0, 5)});
+      const Matrix  map    = moved * Rotation(Degrees(draws.Near(0, 180))) * Scaling(major, minor);
       const Ellipse whole  = {.Map = map, .Start = Degrees(draws.Near(0, 180)), .Sweep = Turn};
       const double  along  = draws.Near(0, 1.5 * major);
       const double  across = draws.Near(0, 1.5 * major);
