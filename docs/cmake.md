@@ -75,7 +75,10 @@ errors, `-Wfloat-equal` and `-Wdouble-promotion` among them: floating
 point values compare through a tolerance, never with `==`.
 
 Every build rounds each product and sum on its own: `-ffp-contract=off`
-with GCC and Clang, `/fp:precise` with MSVC, and no `-ffast-math`. Clang
+with GCC and Clang, `/fp:strict` with MSVC, and no `-ffast-math`. MSVC's
+`/fp:precise` is not enough: optimizing, it rewrites floating point code
+once inlined, and a dozen tests of Bézier curves and splines gave other
+answers on Windows until `/fp:strict` stopped it. Clang
 fuses `a * b - c * d` by default on arm64, which breaks the exact
 predicates and makes arm64 and x86-64 disagree. `tests/geoxy/bits.cpp` holds
 a checksum of a million seeded operations that must be one number on every

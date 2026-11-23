@@ -151,30 +151,6 @@ jobs:
             preset: release
             cxx: cl
             launcher: sccache
-          - name: windows-strict
-            os: windows-2025
-            preset: release
-            cxx: cl
-            launcher: sccache
-            configure: -DGEOXY_TRY_FP=strict
-          - name: windows-o1
-            os: windows-2025
-            preset: release
-            cxx: cl
-            launcher: sccache
-            configure: '"-DCMAKE_CXX_FLAGS_RELEASE=/O1 /DNDEBUG"'
-          - name: windows-noinline
-            os: windows-2025
-            preset: release
-            cxx: cl
-            launcher: sccache
-            configure: '"-DCMAKE_CXX_FLAGS_RELEASE=/O2 /Ob0 /DNDEBUG"'
-          - name: windows-nossa
-            os: windows-2025
-            preset: release
-            cxx: cl
-            launcher: sccache
-            configure: '"-DCMAKE_CXX_FLAGS_RELEASE=/O2 /Ob2 /DNDEBUG /d2SSAOptimizer-"'
           - name: sanitize
             os: ubuntu-26.04
             preset: sanitize
@@ -226,7 +202,7 @@ jobs:
           save: ${{ github.event_name == 'push' }}
 
       - name: Configure
-        run: cmake --preset ${{ matrix.preset }} ${{ matrix.configure }}
+        run: cmake --preset ${{ matrix.preset }}
 
       # Every job builds everything, the headers-alone check included, but
       # coverage, which builds the target that runs the tests and gates the
