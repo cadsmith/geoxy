@@ -1195,8 +1195,8 @@ namespace Geoxy
     std::size_t differ = 0;
     for (int round = 0; round < Rounds(2000); ++round)
     {
-      const double radius =
-          std::ldexp(draws.Near(1.0, 0.5), static_cast<int>(draws.Next() % 41) - 20);
+      const double radiusFraction = draws.Near(1.0, 0.5);
+      const double radius = std::ldexp(radiusFraction, static_cast<int>(draws.Next() % 41) - 20);
       const Point middle = {.X = draws.Near(0.0, 2.0) * radius, .Y = draws.Near(0.0, 2.0) * radius};
       const double start = draws.Near(0.0, 180.0);
       const double sweep = draws.Near(0.0, 300.0);

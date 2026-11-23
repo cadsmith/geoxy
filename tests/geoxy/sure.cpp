@@ -57,8 +57,8 @@ namespace Geoxy::Sure
      */
     auto Drawn(Draws &draws) -> std::pair<Number, Expansion::Number>
     {
-      const double high =
-          std::ldexp(draws.Near(0.0, 1.0), static_cast<int>(draws.Next() % 64) - 32);
+      const double highFraction = draws.Near(0.0, 1.0);
+      const double high  = std::ldexp(highFraction, static_cast<int>(draws.Next() % 64) - 32);
       const double error = high * std::ldexp(draws.Near(0.0, 1.0), -60);
       return {Number{.Value = {.High = high, .Low = 0.0}, .Bound = std::abs(error)},
               Expansion::Sum(Expansion::Of(high), Expansion::Of(error))};

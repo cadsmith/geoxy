@@ -685,9 +685,11 @@ namespace Geoxy::Crossings
     int   differ = 0;
     for (int round = 0; round < 20000; ++round)
     {
-      const double size  = std::ldexp(1.0, static_cast<int>(40 * mixer.Unit()));
-      const double far   = std::ldexp(mixer.Unit(), static_cast<int>(30 * (mixer.Unit() + 1)));
-      const double slant = std::ldexp(mixer.Unit(), -static_cast<int>(20 * (mixer.Unit() + 1)));
+      const double size        = std::ldexp(1.0, static_cast<int>(40 * mixer.Unit()));
+      const double farFraction = mixer.Unit();
+      const double far         = std::ldexp(farFraction, static_cast<int>(30 * (mixer.Unit() + 1)));
+      const double slantFraction = mixer.Unit();
+      const double slant = std::ldexp(slantFraction, -static_cast<int>(20 * (mixer.Unit() + 1)));
       const Line   one   = {
           .Start = {.X = far + (size * mixer.Unit()), .Y = far + (size * mixer.Unit())},
           .End   = {.X = far + (size * mixer.Unit()), .Y = far + (size * mixer.Unit())}};
@@ -855,8 +857,9 @@ namespace Geoxy::Crossings
     int   crossed = 0;
     for (int round = 0; round < 20000; ++round)
     {
-      const double size   = std::ldexp(1.0, static_cast<int>(30 * mixer.Unit()));
-      const double far    = std::ldexp(mixer.Unit(), static_cast<int>(25 * (mixer.Unit() + 1)));
+      const double size        = std::ldexp(1.0, static_cast<int>(30 * mixer.Unit()));
+      const double farFraction = mixer.Unit();
+      const double far         = std::ldexp(farFraction, static_cast<int>(25 * (mixer.Unit() + 1)));
       const Point  centre = {.X = far + (size * mixer.Unit()), .Y = far + (size * mixer.Unit())};
       const Arc    circle = {.Center = centre,
                              .Radius = size * (0.5 + std::abs(mixer.Unit())),

@@ -107,9 +107,11 @@ namespace Geoxy
     Draws draws{0x696E76U};
     for (int index = 0; index < 1000; ++index)
     {
-      const Matrix map = Translation({.X = draws.Near(5e6, 1e3), .Y = draws.Near(-3e6, 1e3)})
-                       * Rotation(Radians(draws.Near(0, 4)))
-                       * Scaling(draws.Near(2, 1), draws.Near(-2, 1));
+      const Matrix moved  = Translation({.X = draws.Near(5e6, 1e3), .Y = draws.Near(-3e6, 1e3)});
+      const Matrix turned = Rotation(Radians(draws.Near(0, 4)));
+      const double alongX = draws.Near(2, 1);
+      const double alongY = draws.Near(-2, 1);
+      const Matrix map    = moved * turned * Scaling(alongX, alongY);
       const std::optional<Matrix> inverse = Inverse(map);
       REQUIRE(inverse);
       const Point point = {.X = draws.Near(5e6, 1e3), .Y = draws.Near(-3e6, 1e3)};

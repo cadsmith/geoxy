@@ -800,10 +800,11 @@ namespace Geoxy
     Draws draws{0xA2C5};
     for (int round = 0; round < Rounds(1600); ++round)
     {
-      const double offset = std::ldexp(draws.Near(0, 1), static_cast<int>(draws.Next() % 41));
-      const Point  origin = {.X = offset, .Y = offset * draws.Near(0, 1)};
-      const double radius =
-          std::ldexp(draws.Near(1.5, 0.5), static_cast<int>(draws.Next() % 9) - 4);
+      const double offsetFraction = draws.Near(0, 1);
+      const double offset         = std::ldexp(offsetFraction, static_cast<int>(draws.Next() % 41));
+      const Point  origin         = {.X = offset, .Y = offset * draws.Near(0, 1)};
+      const double radiusFraction = draws.Near(1.5, 0.5);
+      const double radius = std::ldexp(radiusFraction, static_cast<int>(draws.Next() % 9) - 4);
       const double within = std::max(radius * std::ldexp(1.0, -static_cast<int>(draws.Next() % 25)),
                                      0x1p-46 * (std::abs(origin.X) + std::abs(origin.Y) + radius));
       CAPTURE(round);

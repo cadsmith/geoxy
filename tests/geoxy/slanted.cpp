@@ -222,9 +222,15 @@ namespace Geoxy
       const Point  vertex =
           Toward({.X = draws.Near(0.0, 8.0) * scale, .Y = draws.Near(0.0, 8.0) * scale}, {}, grid);
       const double bearing = draws.Near(0.0, Pi);
-      const double turn = draws.Next() % 2 == 0 ? draws.Near(0.0, Pi)
-                                                : std::ldexp(draws.Near(0.0, 1.0),
-                                                             -static_cast<int>(draws.Next() % 30));
+      const double turn    = [&draws]() -> double
+      {
+        if (draws.Next() % 2 == 0)
+        {
+          return draws.Near(0.0, Pi);
+        }
+        const double fraction = draws.Near(0.0, 1.0);
+        return std::ldexp(fraction, -static_cast<int>(draws.Next() % 30));
+      }();
       const Point from = Toward(vertex, Heading(bearing + Pi, draws.Near(2.5, 2.49) * scale), grid);
       const Point onward =
           Toward(vertex, Heading(bearing + turn, draws.Near(2.5, 2.49) * scale), grid);
@@ -591,10 +597,16 @@ namespace Geoxy
       const double bearing = draws.Next() % 4 == 0
                                ? Pi / 2.0 * static_cast<double>(draws.Next() % 4)
                                : draws.Near(0.0, Pi);
-      const double turn = draws.Next() % 2 == 0 ? draws.Near(0.0, Pi)
-                                                : std::ldexp(draws.Near(0.0, 1.0),
-                                                             -static_cast<int>(draws.Next() % 40));
-      const double far  = draws.Next() % 8 == 0 ? std::ldexp(1.0, -40) : 1.0;
+      const double turn    = [&draws]() -> double
+      {
+        if (draws.Next() % 2 == 0)
+        {
+          return draws.Near(0.0, Pi);
+        }
+        const double fraction = draws.Near(0.0, 1.0);
+        return std::ldexp(fraction, -static_cast<int>(draws.Next() % 40));
+      }();
+      const double far = draws.Next() % 8 == 0 ? std::ldexp(1.0, -40) : 1.0;
       const Point from = Toward(vertex, Heading(bearing + Pi, draws.Near(2.5, 2.49) * scale), grid);
       const Point onward =
           Toward(vertex, Heading(bearing + turn, draws.Near(2.5, 2.49) * scale * far), grid);

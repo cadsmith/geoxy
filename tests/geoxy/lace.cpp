@@ -327,8 +327,8 @@ namespace Geoxy
         spline.Weights.resize(spline.Poles.size());
         for (double &weight : spline.Weights)
         {
-          weight = std::ldexp(1.0 + (0.5 * draws.Near(0.0, 1.0)),
-                              static_cast<int>(draws.Next() % 3) - 1);
+          const double fraction = 1.0 + (0.5 * draws.Near(0.0, 1.0));
+          weight                = std::ldexp(fraction, static_cast<int>(draws.Next() % 3) - 1);
         }
       }
       const auto   moving = draws.Next() % 6;
