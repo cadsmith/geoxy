@@ -1,12 +1,13 @@
 # Indexing a drawing
 
-Asking every curve of a drawing a question takes time in proportion to the drawing. geoxy has three indexes that ask only the curves that could matter, and give the same answers as asking them all.
+Asking every curve of a drawing a question takes time in proportion to the drawing. geoxy has four indexes that ask only the curves that could matter, and give the same answers as asking them all.
 
 | Index | Holds | Good for |
 | :--- | :--- | :--- |
 | `Tree` | curves, added and removed one at a time | picking, snapping, ray shots while editing |
 | `Cloud` | points, added and removed one at a time | endpoint snaps, joining loose ends |
 | `Grid` | a fixed set of curves | every intersection of a drawing at once |
+| `Boxes` | boxes only, each under a tag you choose | indexing geometry your program keeps itself |
 
 ## A tree of curves {#tree}
 
@@ -82,6 +83,59 @@ auto main() -> int
 ```text [Output]
 point 2 at (4, 3) is 0.4123 away
 point 1 at (4, 0) is 2.9275 away
+```
+
+## Boxes under your own tags {#boxes}
+
+A `Boxes` keeps boxes only, each under a 64-bit tag you choose, and never the curves they bound: use it when your program keeps its own geometry. Build it once from every box, then `Insert` and `Erase` one box at a time as things change; neither looks at the other boxes. `Extents` is the exact box of them all, read from the tree's root. `Overlapping` gives the tags whose boxes overlap a box and `Within` those whose boxes lie wholly inside it, exactly; `Nearest` goes outward from a point, nearest first, by a distance you supply, measuring only what could come next. Each query also takes a visitor that is told of each tag as it is found and returns `false` to stop, so that nothing is allocated.
+
+```cpp [main.cpp]
+#include "geoxy/geoxy.hpp"
+
+#include <print>
+
+auto main() -> int
+{
+  const std::array<Geoxy::Boxes::Entry, 3> entries = {
+      Geoxy::Boxes::Entry{.Tag = 10, .Bounds = {.Min = {.X = 0, .Y = 0}, .Max = {.X = 4, .Y = 2}}},
+      Geoxy::Boxes::Entry{.Tag = 11, .Bounds = {.Min = {.X = 6, .Y = 1}, .Max = {.X = 9, .Y = 5}}},
+      Geoxy::Boxes::Entry{.Tag = 12, .Bounds = {.Min = {.X = 1, .Y = 7}, .Max = {.X = 3, .Y = 8}}},
+  };
+  Geoxy::Boxes boxes{entries};
+
+  const Geoxy::Box all = boxes.Extents();
+  std::println("extents ({}, {}) to ({}, {})", all.Min.X, all.Min.Y, all.Max.X, all.Max.Y);
+
+  // One box moved, one taken out: the extents follow.
+  boxes.Insert(11, {.Min = {.X = 5, .Y = 1}, .Max = {.X = 6, .Y = 3}});
+  boxes.Erase(12);
+  const Geoxy::Box now = boxes.Extents();
+  std::println("now     ({}, {}) to ({}, {})", now.Min.X, now.Min.Y, now.Max.X, now.Max.Y);
+
+  const Geoxy::Box window = {.Min = {.X = -1, .Y = -1}, .Max = {.X = 5, .Y = 3}};
+  std::println("{} overlap the window, {} lie within it", boxes.Overlapping(window).size(), boxes.Within(window).size());
+
+  // The distance is yours: here, to the box itself.
+  const Geoxy::Point cursor   = {.X = 5.5, .Y = 4};
+  const auto         distance = [&boxes, cursor](std::uint64_t tag) -> double
+  {
+    const Geoxy::Box box = *boxes.Bounds(tag);
+    return Geoxy::Distance(Geoxy::Point{.X = std::clamp(cursor.X, box.Min.X, box.Max.X),
+                                        .Y = std::clamp(cursor.Y, box.Min.Y, box.Max.Y)},
+                           cursor);
+  };
+  for (const Geoxy::Boxes::Close &close : boxes.Nearest(cursor, {.Count = 1}, distance))
+  {
+    std::println("nearest: tag {} at {}", close.Tag, close.Distance);
+  }
+}
+```
+
+```text [Output]
+extents (0, 0) to (9, 8)
+now     (0, 0) to (6, 3)
+2 overlap the window, 1 lie within it
+nearest: tag 11 at 1
 ```
 
 ## Every intersection at once {#grid}

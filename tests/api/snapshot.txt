@@ -336,6 +336,76 @@ namespace Geoxy
   [[nodiscard]] GEOXY_API auto Center(const Box &box) -> Point;
   [[nodiscard]] GEOXY_API auto Padded(const Box &box, double margin) -> Box;
 }
+== geoxy/boxes.hpp
+#include "geoxy/api.hpp"
+#include "geoxy/box.hpp"
+#include "geoxy/point.hpp"
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <limits>
+#include <memory>
+#include <optional>
+#include <span>
+#include <unordered_map>
+#include <vector>
+namespace Geoxy
+{
+  struct Boughs;
+  class Boxes
+  {
+  public:
+    struct Entry
+    {
+      std::uint64_t Tag    = 0;  
+      Box           Bounds = {}; 
+    };
+    struct Close
+    {
+      std::uint64_t Tag      = 0;   
+      double        Distance = 0.0; 
+      [[nodiscard]] friend constexpr auto operator==(const Close &lhs, const Close &rhs) -> bool
+      {
+        return lhs.Tag == rhs.Tag && std::equal_to<double>{}(lhs.Distance, rhs.Distance);
+      }
+    };
+    using Measure = std::function<double(std::uint64_t tag)>;
+    using Visit = std::function<bool(std::uint64_t tag)>;
+    using Walk = std::function<bool(const Close &close)>;
+    static constexpr double Anywhere = std::numeric_limits<double>::infinity();
+    struct Seeking
+    {
+      std::size_t Count  = 1;        
+      double      Within = Anywhere; 
+    };
+    GEOXY_API Boxes();
+    GEOXY_API explicit Boxes(std::span<const Entry> entries);
+    GEOXY_API Boxes(const Boxes &other);
+    GEOXY_API Boxes(Boxes &&other) noexcept;
+    GEOXY_API auto operator=(const Boxes &other) -> Boxes &;
+    GEOXY_API auto operator=(Boxes &&other) noexcept -> Boxes &;
+    GEOXY_API ~Boxes();
+    [[nodiscard]] auto Size() const -> std::size_t { return m_Marks.size(); }
+    [[nodiscard]] auto Holds(std::uint64_t tag) const -> bool { return m_Marks.contains(tag); }
+    [[nodiscard]] GEOXY_API auto Bounds(std::uint64_t tag) const -> std::optional<Box>;
+    GEOXY_API void Insert(std::uint64_t tag, const Box &box);
+    GEOXY_API void Erase(std::uint64_t tag);
+    [[nodiscard]] GEOXY_API auto Extents() const -> Box;
+    [[nodiscard]] GEOXY_API auto Overlapping(const Box &box) const -> std::vector<std::uint64_t>;
+    GEOXY_API void Overlapping(const Box &box, const Visit &visit) const;
+    [[nodiscard]] GEOXY_API auto Within(const Box &box) const -> std::vector<std::uint64_t>;
+    GEOXY_API void Within(const Box &box, const Visit &visit) const;
+    [[nodiscard]] GEOXY_API auto Nearest(Point point, const Seeking &seeking,
+                                         const Measure &distance) const -> std::vector<Close>;
+    GEOXY_API void Nearest(Point point, const Measure &distance, const Walk &walk) const;
+  private:
+    std::unordered_map<std::uint64_t, std::size_t> m_Marks = {}; 
+    std::vector<std::uint64_t> m_Tags  = {}; 
+    std::vector<Box>           m_Kept  = {}; 
+    std::vector<std::size_t>   m_Spare = {}; 
+    std::unique_ptr<Boughs>    m_Boughs;     
+  };
+}
 == geoxy/chamfer.hpp
 #include "geoxy/angle.hpp"
 #include "geoxy/api.hpp"
@@ -916,6 +986,7 @@ namespace Geoxy
 #include "geoxy/bezier/cubic.hpp"
 #include "geoxy/bezier/quadratic.hpp"
 #include "geoxy/box.hpp"
+#include "geoxy/boxes.hpp"
 #include "geoxy/chamfer.hpp"
 #include "geoxy/clip.hpp"
 #include "geoxy/cloud.hpp"

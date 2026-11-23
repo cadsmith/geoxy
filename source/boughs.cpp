@@ -37,21 +37,19 @@ namespace Geoxy
       return !IsEmpty(box) && std::isfinite((box.Max.X - box.Min.X) + (box.Max.Y - box.Min.Y));
     }
 
-    /**
-     *  A box a little larger, by a few steps of a double at its size.
-     *
-     *  @param  box The box.
-     *  @return     It, grown.
-     */
-    auto Swollen(const Box &box) -> Box
-    {
-      const double size = std::max(
-          {std::abs(box.Min.X), std::abs(box.Min.Y), std::abs(box.Max.X), std::abs(box.Max.Y)});
-      const double pad = size * Pad;
-      return {.Min = {.X = box.Min.X - pad, .Y = box.Min.Y - pad},
-              .Max = {.X = box.Max.X + pad, .Y = box.Max.Y + pad}};
-    }
+  } // namespace
 
+  auto Boughs::Padded(const Box &box) -> Box
+  {
+    const double size = std::max(
+        {std::abs(box.Min.X), std::abs(box.Min.Y), std::abs(box.Max.X), std::abs(box.Max.Y)});
+    const double pad = size * Pad;
+    return {.Min = {.X = box.Min.X - pad, .Y = box.Min.Y - pad},
+            .Max = {.X = box.Max.X + pad, .Y = box.Max.Y + pad}};
+  }
+
+  namespace
+  {
     /**
      *  The middle of a box, across or upward.
      *
@@ -233,7 +231,7 @@ namespace Geoxy
     {
       if (Bounded(boxes[mark]))
       {
-        row.push_back({.Bounds = Swollen(boxes[mark]), .Mark = mark});
+        row.push_back({.Bounds = boxes[mark], .Mark = mark});
       }
       else
       {
@@ -268,13 +266,12 @@ namespace Geoxy
       Homes[mark] = Adrift;
       return;
     }
-    const Box   grown = Swollen(box);
-    std::size_t limb  = Root;
+    std::size_t limb = Root;
     while (!Limbs[limb].Leaf)
     {
-      limb = Limbs[limb].Marks.at(Chosen(Limbs[limb], grown));
+      limb = Limbs[limb].Marks.at(Chosen(Limbs[limb], box));
     }
-    std::optional<Entry> spill = Put(limb, {.Bounds = grown, .Mark = mark});
+    std::optional<Entry> spill = Put(limb, {.Bounds = box, .Mark = mark});
     while (limb != Root)
     {
       const std::size_t parent                   = Limbs[limb].Parent;
@@ -289,6 +286,11 @@ namespace Geoxy
       Housed(top, *spill);
       Root = top;
     }
+  }
+
+  auto Boughs::Whole() const -> Box
+  {
+    return Bounds(Limbs[Root]);
   }
 
   void Boughs::Dropped(std::size_t mark)
