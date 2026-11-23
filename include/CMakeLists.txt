@@ -9,6 +9,7 @@ set(GEOXY_HEADERS
   geoxy/bezier/cubic.hpp
   geoxy/bezier/quadratic.hpp
   geoxy/box.hpp
+  geoxy/boxes.hpp
   geoxy/chamfer.hpp
   geoxy/clip.hpp
   geoxy/cloud.hpp

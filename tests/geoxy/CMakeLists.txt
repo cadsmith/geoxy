@@ -9,6 +9,7 @@ target_sources(geoxy_tests
     axis.cpp
     bits.cpp
     box.cpp
+    boxes.cpp
     braid.cpp
     chamfer.cpp
     clip.cpp

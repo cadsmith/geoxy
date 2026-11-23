@@ -18,6 +18,7 @@ add_library(geoxy
   belt/near.cpp
   boughs.cpp
   box.cpp
+  boxes.cpp
   chain.cpp
   chamfer.cpp
   clip.cpp

@@ -16,11 +16,14 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <limits>
 #include <optional>
 #include <queue>
 #include <span>
+#include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -83,18 +86,20 @@ namespace Geoxy
      */
     struct Nearer
     {
-      double      Distance = 0.0; /**< How far. */
-      std::size_t Mark     = 0;   /**< Which.   */
+      double        Distance = 0.0; /**< How far.                               */
+      std::size_t   Mark     = 0;   /**< Which.                                 */
+      std::uint64_t Order    = 0;   /**< Its place among those as far: its key. */
 
       /**
-       *  What two are ordered by: the distance, then the mark.
+       *  What two are ordered by: the distance, then the key.
        *
        *  @param  one One.
-       *  @return     Its distance and its mark.
+       *  @return     Its distance and its key.
        */
-      [[nodiscard]] static constexpr auto Rank(const Nearer &one) -> std::pair<double, std::size_t>
+      [[nodiscard]] static constexpr auto Rank(const Nearer &one)
+          -> std::pair<double, std::uint64_t>
       {
-        return {one.Distance, one.Mark};
+        return {one.Distance, one.Order};
       }
     };
 
@@ -110,6 +115,19 @@ namespace Geoxy
     /**
      *  A limb or a mark yet to be looked at, and the least distance anything in it can be at.
      */
+    /**
+     *  How the marks nearest a point are ranked: how far each is, and its key among those as far.
+     *
+     *  @tparam FarT How far a mark is.
+     *  @tparam KeyT A mark's key.
+     */
+    template <typename FarT, typename KeyT>
+    struct Ranking
+    {
+      FarT Far; /**< How far a mark is. */
+      KeyT Key; /**< A mark's key.      */
+    };
+
     struct Ahead
     {
       double      Bound = 0.0;   /**< The least distance.    */
@@ -143,6 +161,22 @@ namespace Geoxy
      *  @return       Them, kept.
      */
     [[nodiscard]] static auto Packed(std::span<const Box> boxes) -> Boughs;
+
+    /**
+     *  A box padded by 2^-50 of its largest coordinate's magnitude on every side, as every query
+     *  sees the boxes kept, so that no rounding of what is asked about leaves one out.
+     *
+     *  @param  box The box, kept exact.
+     *  @return     It padded.
+     */
+    [[nodiscard]] static auto Padded(const Box &box) -> Box;
+
+    /**
+     *  The exact box of every box kept with finite sides: the root's.
+     *
+     *  @return The box; empty where none is kept.
+     */
+    [[nodiscard]] auto Whole() const -> Box;
 
     /**
      *  A box more.
@@ -240,9 +274,24 @@ namespace Geoxy
     template <typename ReachesT, typename SinkT>
     void Each(const ReachesT &reaches, const SinkT &sink) const
     {
+      const auto told = [&sink](std::size_t mark) -> bool
+      {
+        if constexpr (std::is_same_v<decltype(sink(mark)), bool>)
+        {
+          return sink(mark);
+        }
+        else
+        {
+          sink(mark);
+          return true;
+        }
+      };
       for (const std::size_t mark : Loose)
       {
-        sink(mark);
+        if (!told(mark))
+        {
+          return;
+        }
       }
       std::vector<std::size_t> walk = {Root};
       while (!walk.empty())
@@ -251,17 +300,78 @@ namespace Geoxy
         walk.pop_back();
         for (std::size_t slot = 0; slot < limb.Count; ++slot)
         {
-          if (!reaches(limb.Boxes.at(slot)))
+          if (!reaches(Padded(limb.Boxes.at(slot))))
           {
             continue;
           }
           if (limb.Leaf)
           {
-            sink(limb.Marks.at(slot));
+            if (!told(limb.Marks.at(slot)))
+            {
+              return;
+            }
           }
           else
           {
             walk.push_back(limb.Marks.at(slot));
+          }
+        }
+      }
+    }
+
+    /**
+     *  Every mark in order of distance from a point, those as far in the order of their keys, told
+     *  one at a time until the walk says stop: limbs taken nearest box first, and a limb no farther
+     *  than a mark before it, so that the order is exact without looking at every mark.
+     *
+     *  @tparam FarT    How far a mark is from the point.
+     *  @tparam KeyT    A mark's key.
+     *  @tparam WalkT   What is told of each mark, in order: false to stop.
+     *  @param  point   The point.
+     *  @param  ranking Tells how far a mark is, never less than its box, a mark it tells no number
+     *                  for left out, and its key.
+     *  @param  walk    Told each mark and its distance, nearest first.
+     */
+    template <typename FarT, typename KeyT, typename WalkT>
+    void Outward(Point point, const Ranking<FarT, KeyT> &ranking, const WalkT &walk) const
+    {
+      using Step = std::tuple<double, bool, std::uint64_t, std::size_t>;
+      std::priority_queue<Step, std::vector<Step>, std::greater<>> ahead;
+      const auto offer = [&ahead, &ranking](std::size_t mark) -> void
+      {
+        const double distance = ranking.Far(mark);
+        if (distance >= 0.0)
+        {
+          ahead.emplace(distance, true, ranking.Key(mark), mark);
+        }
+      };
+      for (const std::size_t mark : Loose)
+      {
+        offer(mark);
+      }
+      ahead.emplace(0.0, false, 0, Root);
+      while (!ahead.empty())
+      {
+        const auto [bound, marked, key, which] = ahead.top();
+        ahead.pop();
+        if (marked)
+        {
+          if (!walk(Nearer{.Distance = bound, .Mark = which, .Order = key}))
+          {
+            return;
+          }
+          continue;
+        }
+        const Bough &limb = Limbs[which];
+        for (std::size_t slot = 0; slot < limb.Count; ++slot)
+        {
+          if (limb.Leaf)
+          {
+            offer(limb.Marks.at(slot));
+          }
+          else
+          {
+            ahead.emplace(Apart(Padded(limb.Boxes.at(slot)), point), false, 0, limb.Marks.at(slot));
           }
         }
       }
@@ -281,14 +391,40 @@ namespace Geoxy
     [[nodiscard]] auto Closest(Point point, const Limit &most, const FarT &far) const
         -> std::vector<Nearer>
     {
+      const auto mark = [](std::size_t index) -> std::uint64_t
+      {
+        return index;
+      };
+      return Closest(point, most,
+                     Ranking<FarT, std::remove_cvref_t<decltype(mark)>>{.Far = far, .Key = mark});
+    }
+
+    /**
+     *  The marks nearest a point, the nearest first, those as near in the order of a key: as the
+     *  other Closest, ranked by distance and then by the key.
+     *
+     *  @tparam FarT    How far a mark is from the point.
+     *  @tparam KeyT    A mark's key.
+     *  @param  point   The point.
+     *  @param  most    How many at most, and how far at most.
+     *  @param  ranking Tells how far a mark is, a mark it tells no number for left out, and its
+     *                  key.
+     *  @return         The marks, by distance, then by key.
+     */
+    template <typename FarT, typename KeyT>
+    [[nodiscard]] auto Closest(Point point, const Limit &most,
+                               const Ranking<FarT, KeyT> &ranking) const -> std::vector<Nearer>
+    {
+      const FarT         &far = ranking.Far;
+      const KeyT         &key = ranking.Key;
       std::vector<Nearer> best;
       if (most.Count == 0)
       {
         return best;
       }
-      const auto offer = [&best, &most, &far](std::size_t mark) -> void
+      const auto offer = [&best, &most, &far, &key](std::size_t mark) -> void
       {
-        const Nearer one = {.Distance = far(mark), .Mark = mark};
+        const Nearer one = {.Distance = far(mark), .Mark = mark, .Order = key(mark)};
         if (!(one.Distance <= most.Within))
         {
           return;
@@ -324,7 +460,7 @@ namespace Geoxy
         const Bough &limb = Limbs[next.Mark];
         for (std::size_t slot = 0; slot < limb.Count; ++slot)
         {
-          ahead.push({.Bound = Apart(limb.Boxes.at(slot), point),
+          ahead.push({.Bound = Apart(Padded(limb.Boxes.at(slot)), point),
                       .Mark  = limb.Marks.at(slot),
                       .Limb  = !limb.Leaf});
         }

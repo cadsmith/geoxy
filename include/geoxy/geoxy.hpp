@@ -16,6 +16,7 @@
 #include "geoxy/bezier/cubic.hpp"     // IWYU pragma: export
 #include "geoxy/bezier/quadratic.hpp" // IWYU pragma: export
 #include "geoxy/box.hpp"              // IWYU pragma: export
+#include "geoxy/boxes.hpp"            // IWYU pragma: export
 #include "geoxy/chamfer.hpp"          // IWYU pragma: export
 #include "geoxy/clip.hpp"             // IWYU pragma: export
 #include "geoxy/cloud.hpp"            // IWYU pragma: export
