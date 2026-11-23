@@ -151,18 +151,30 @@ jobs:
             preset: release
             cxx: cl
             launcher: sccache
-          - name: windows-clang-cl
+          - name: windows-strict
             os: windows-2025
             preset: release
-            cxx: clang-cl
-            launcher: sccache
-            configure: -DCMAKE_C_COMPILER=clang-cl
-          - name: windows-debug
-            os: windows-2025
-            preset: debug
             cxx: cl
             launcher: sccache
-            configure: -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
+            configure: -DGEOXY_TRY_FP=strict
+          - name: windows-o1
+            os: windows-2025
+            preset: release
+            cxx: cl
+            launcher: sccache
+            configure: '"-DCMAKE_CXX_FLAGS_RELEASE=/O1 /DNDEBUG"'
+          - name: windows-noinline
+            os: windows-2025
+            preset: release
+            cxx: cl
+            launcher: sccache
+            configure: '"-DCMAKE_CXX_FLAGS_RELEASE=/O2 /Ob0 /DNDEBUG"'
+          - name: windows-nossa
+            os: windows-2025
+            preset: release
+            cxx: cl
+            launcher: sccache
+            configure: '"-DCMAKE_CXX_FLAGS_RELEASE=/O2 /Ob2 /DNDEBUG /d2SSAOptimizer-"'
           - name: sanitize
             os: ubuntu-26.04
             preset: sanitize
