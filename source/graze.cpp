@@ -1544,8 +1544,9 @@ namespace Geoxy
        *  Every place apart from every other past Spread, so that each is in Intersect's order.
        */
       std::array<std::size_t, 4> order = {0, 1, 2, 3};
-      std::ranges::sort(std::span{order}.first(count), {},
-                        [&places](std::size_t index) -> double { return places.at(index); });
+      std::ranges::sort(
+          order, {}, [&places, count](std::size_t index) -> double
+          { return index < count ? places.at(index) : std::numeric_limits<double>::infinity(); });
       for (std::size_t index = 1; index < count; ++index)
       {
         lost += static_cast<int>(

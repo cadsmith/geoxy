@@ -767,7 +767,11 @@ namespace Geoxy
           cuts.at(count++) = root;
         }
       }
-      std::ranges::sort(std::span{cuts}.first(count));
+      /**
+       *  The cuts past count are 1, no less than any root kept: sorting all four leaves the first
+       *  count as sorting those alone would, and GCC sees the array's size.
+       */
+      std::ranges::sort(cuts);
       return {cuts, count};
     }
 
