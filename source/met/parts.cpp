@@ -197,6 +197,22 @@ namespace Geoxy::Met
       return polyline->Closed ? List<Point>{} : ends;
     }
     /**
+     *  An arc or an ellipse swept a whole number of turns is closed, as the direct ways take it,
+     *  though its ends, worked out from a start in radians and a sweep in degrees, may lie a step
+     *  of a double apart.
+     */
+    const auto *arc     = std::get_if<Arc>(&curve);
+    const auto *ellipse = std::get_if<Ellipse>(&curve);
+    if (arc != nullptr || ellipse != nullptr)
+    {
+      const double degrees = (arc != nullptr ? arc->Sweep : ellipse->Sweep).InDegrees();
+      if (!(std::fpclassify(degrees)                               == FP_ZERO)
+          && std::fpclassify(std::fmod(degrees, Turn.InDegrees())) == FP_ZERO)
+      {
+        return {};
+      }
+    }
+    /**
      *  Only a curve whose ends are one point may close on itself: its box, which costs a pass over
      *  a spline's spans, is asked of no other.
      */

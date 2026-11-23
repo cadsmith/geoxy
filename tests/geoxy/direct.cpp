@@ -134,7 +134,8 @@ namespace Geoxy
                 .End   = middle + (across * scale * mixer.Unit()) + (way * mixer.Unit())};
       case 1:
       {
-        const double slope = std::ldexp(mixer.Unit(), -static_cast<int>(mixer.Pick(40)));
+        const double slopeFraction = mixer.Unit();
+        const double slope         = std::ldexp(slopeFraction, -static_cast<int>(mixer.Pick(40)));
         return {.Start = middle - (way * 0.3) - (across * slope * scale),
                 .End   = middle + (way * 0.3) + (across * slope * scale)};
       }
@@ -425,9 +426,10 @@ namespace Geoxy
     const int rounds = Rounds(50000);
     for (int round = 0; round < rounds; ++round)
     {
-      const double away  = std::ldexp(mixer.Unit(), static_cast<int>(mixer.Pick(28)));
-      const double size  = std::ldexp(1.0, static_cast<int>(mixer.Pick(12)) - 4);
-      const Point  base  = {.X = away, .Y = -away};
+      const double awayFraction = mixer.Unit();
+      const double away         = std::ldexp(awayFraction, static_cast<int>(mixer.Pick(28)));
+      const double size         = std::ldexp(1.0, static_cast<int>(mixer.Pick(12)) - 4);
+      const Point  base         = {.X = away, .Y = -away};
       const Line   first = {.Start = base + (Vector{.X = mixer.Unit(), .Y = mixer.Unit()} * size),
                             .End   = base + (Vector{.X = mixer.Unit(), .Y = mixer.Unit()} * size)};
       const double near  = std::ldexp(size, -static_cast<int>(mixer.Pick(30)) - 6);
@@ -484,9 +486,10 @@ namespace Geoxy
     const int rounds = Rounds(40000);
     for (int round = 0; round < rounds; ++round)
     {
-      const double away  = std::ldexp(mixer.Unit(), static_cast<int>(mixer.Pick(28)));
-      const double size  = std::ldexp(1.0, static_cast<int>(mixer.Pick(12)) - 4);
-      const Point  base  = {.X = away, .Y = -away};
+      const double awayFraction = mixer.Unit();
+      const double away         = std::ldexp(awayFraction, static_cast<int>(mixer.Pick(28)));
+      const double size         = std::ldexp(1.0, static_cast<int>(mixer.Pick(12)) - 4);
+      const Point  base         = {.X = away, .Y = -away};
       const Line   first = {.Start = base + (Vector{.X = mixer.Unit(), .Y = mixer.Unit()} * size),
                             .End   = base + (Vector{.X = mixer.Unit(), .Y = mixer.Unit()} * size)};
       const Vector way   = Vector{.X = mixer.Unit(), .Y = mixer.Unit()} * size;
@@ -526,9 +529,10 @@ namespace Geoxy
     const int rounds = Rounds(30000);
     for (int round = 0; round < rounds; ++round)
     {
-      const double away   = std::ldexp(mixer.Unit(), static_cast<int>(mixer.Pick(24)));
-      const double size   = std::ldexp(1.0, static_cast<int>(mixer.Pick(10)) - 3);
-      const double near   = std::ldexp(size, -static_cast<int>(mixer.Pick(30)) - 6);
+      const double awayFraction = mixer.Unit();
+      const double away         = std::ldexp(awayFraction, static_cast<int>(mixer.Pick(24)));
+      const double size         = std::ldexp(1.0, static_cast<int>(mixer.Pick(10)) - 3);
+      const double near         = std::ldexp(size, -static_cast<int>(mixer.Pick(30)) - 6);
       const Point  centre = {.X = away + (size * mixer.Unit()), .Y = -away + (size * mixer.Unit())};
       const Arc    arc    = Round(mixer, {.Centre = centre, .Size = size, .Near = near});
       Curve        other;
@@ -644,10 +648,11 @@ namespace Geoxy
     const int rounds = Rounds(40000);
     for (int round = 0; round < rounds; ++round)
     {
-      const double away   = std::ldexp(mixer.Unit(), static_cast<int>(mixer.Pick(24)));
-      const double size   = std::ldexp(1.0, static_cast<int>(mixer.Pick(12)) - 4);
-      const Point  centre = {.X = away, .Y = -away};
-      const bool   whole  = mixer.Pick(4) == 0;
+      const double awayFraction = mixer.Unit();
+      const double away         = std::ldexp(awayFraction, static_cast<int>(mixer.Pick(24)));
+      const double size         = std::ldexp(1.0, static_cast<int>(mixer.Pick(12)) - 4);
+      const Point  centre       = {.X = away, .Y = -away};
+      const bool   whole        = mixer.Pick(4) == 0;
       const Arc   arc = {.Center = centre,
                          .Radius = size,
                          .Start  = Degrees(std::round(mixer.Unit() * 360.0)),
@@ -874,8 +879,10 @@ namespace Geoxy
     const int rounds = Rounds(40000);
     for (int round = 0; round < rounds; ++round)
     {
-      const double away   = std::ldexp(mixer.Unit(), static_cast<int>(mixer.Pick(24)));
-      const double radius = std::ldexp(1.0 + mixer.Unit(), static_cast<int>(mixer.Pick(12)) - 4);
+      const double awayFraction   = mixer.Unit();
+      const double away           = std::ldexp(awayFraction, static_cast<int>(mixer.Pick(24)));
+      const double radiusFraction = 1.0 + mixer.Unit();
+      const double radius = std::ldexp(radiusFraction, static_cast<int>(mixer.Pick(12)) - 4);
       const Point  centre = {.X = away, .Y = -away};
       const auto   angle  = [&mixer](double reach) -> Angle
       {
@@ -976,8 +983,10 @@ namespace Geoxy
     const int rounds = Rounds(40000);
     for (int round = 0; round < rounds; ++round)
     {
-      const double away   = std::ldexp(mixer.Unit(), static_cast<int>(mixer.Pick(24)));
-      const double radius = std::ldexp(1.0 + mixer.Unit(), static_cast<int>(mixer.Pick(12)) - 4);
+      const double awayFraction   = mixer.Unit();
+      const double away           = std::ldexp(awayFraction, static_cast<int>(mixer.Pick(24)));
+      const double radiusFraction = 1.0 + mixer.Unit();
+      const double radius = std::ldexp(radiusFraction, static_cast<int>(mixer.Pick(12)) - 4);
       const Point  centre = {.X = away, .Y = -away};
       const double near   = std::ldexp(radius, -static_cast<int>(mixer.Pick(30)) - 8);
       const double angle  = mixer.Unit() * 2.0 * Pi;
@@ -1107,6 +1116,33 @@ namespace Geoxy
     CHECK(Intersect(circle, half, tolerance).Overlaps.size() == 1);
   }
 
+  /**
+   *  A whole circle swept from a start in radians by a turn in degrees ends a step of a double from
+   *  its start, as the two units round apart; it is closed all the same, and a line nearly tangent
+   *  to it with the seam inside the band about the touch meets it in one touch, the seam no end,
+   *  whichever way it is met. Found by GCC's and MSVC's order of drawing the round above.
+   */
+  TEST_CASE("direct: a whole circle from a start in radians is closed, its seam no end")
+  {
+    const Arc arc = {.Center = {.X = 1.057631319190592, .Y = 4.1404920481633845},
+                     .Radius = 3.557634574530466,
+                     .Start  = Radians(1.8082823069988592),
+                     .Sweep  = Turn};
+    REQUIRE_FALSE(At(arc, 0.0) == At(arc, 1.0));
+    const Curve     line      = Line{.Start = {.X = -5.4903670541715694, .Y = 6.757916190817134},
+                                     .End   = {.X = 6.6145802187051554, .Y = 8.48186403962923}};
+    const Tolerance tolerance = {.Length = 0x1p-5, .Radians = 1e-9};
+    for (const bool swapped : {false, true})
+    {
+      const Curve         one   = swapped ? line : Curve{arc};
+      const Curve         two   = swapped ? Curve{arc} : line;
+      const Intersections found = Thoroughly(one, two, tolerance);
+      REQUIRE(found.Hits.size()     == 1);
+      CHECK(found.Hits.front().Kind == Contact::Touch);
+      CHECK(Agrees({one, two}, tolerance));
+    }
+  }
+
   TEST_CASE("direct: lines through a whole circle's seam, as met thoroughly")
   {
     Mixer     mixer;
@@ -1115,8 +1151,10 @@ namespace Geoxy
     const int rounds = Rounds(40000);
     for (int round = 0; round < rounds; ++round)
     {
-      const double away   = std::ldexp(mixer.Unit(), static_cast<int>(mixer.Pick(24)));
-      const double radius = std::ldexp(1.0 + mixer.Unit(), static_cast<int>(mixer.Pick(12)) - 4);
+      const double awayFraction   = mixer.Unit();
+      const double away           = std::ldexp(awayFraction, static_cast<int>(mixer.Pick(24)));
+      const double radiusFraction = 1.0 + mixer.Unit();
+      const double radius = std::ldexp(radiusFraction, static_cast<int>(mixer.Pick(12)) - 4);
       const Arc    circle = {.Center = {.X = away, .Y = -away},
                              .Radius = radius,
                              .Start  = Degrees(std::round(mixer.Unit() * 720.0) - 360.0),
@@ -1158,22 +1196,24 @@ namespace Geoxy
     const int rounds = Rounds(40000);
     for (int round = 0; round < rounds; ++round)
     {
-      const double away   = std::ldexp(mixer.Unit(), static_cast<int>(mixer.Pick(24)));
-      const double radius = std::ldexp(1.0 + mixer.Unit(), static_cast<int>(mixer.Pick(12)) - 4);
-      const Arc    first  = {.Center = {.X = away, .Y = -away},
-                             .Radius = radius,
-                             .Start  = Radians(mixer.Unit() * 2.0 * Pi),
+      const double awayFraction   = mixer.Unit();
+      const double away           = std::ldexp(awayFraction, static_cast<int>(mixer.Pick(24)));
+      const double radiusFraction = 1.0 + mixer.Unit();
+      const double radius        = std::ldexp(radiusFraction, static_cast<int>(mixer.Pick(12)) - 4);
+      const Arc    first         = {.Center = {.X = away, .Y = -away},
+                                    .Radius = radius,
+                                    .Start  = Radians(mixer.Unit() * 2.0 * Pi),
+                                    .Sweep  = Radians((mixer.Unit() - 0.5) * 3.0 * Pi)};
+      const Point  vertex        = At(first, static_cast<double>(mixer.Pick(2)));
+      const double turn          = mixer.Unit() * 2.0 * Pi;
+      const double reachFraction = 0.5 + mixer.Unit();
+      const double reach  = radius * std::ldexp(reachFraction, static_cast<int>(mixer.Pick(8)) - 4);
+      const Point  centre = vertex + (Vector{.X = std::cos(turn), .Y = std::sin(turn)} * reach);
+      const Arc    second = {.Center = centre,
+                             .Radius = Distance(centre, vertex),
+                             .Start  = Heading(vertex - centre),
                              .Sweep  = Radians((mixer.Unit() - 0.5) * 3.0 * Pi)};
-      const Point  vertex = At(first, static_cast<double>(mixer.Pick(2)));
-      const double turn   = mixer.Unit() * 2.0 * Pi;
-      const double reach =
-          radius * std::ldexp(0.5 + mixer.Unit(), static_cast<int>(mixer.Pick(8)) - 4);
-      const Point     centre = vertex + (Vector{.X = std::cos(turn), .Y = std::sin(turn)} * reach);
-      const Arc       second = {.Center = centre,
-                                .Radius = Distance(centre, vertex),
-                                .Start  = Heading(vertex - centre),
-                                .Sweep  = Radians((mixer.Unit() - 0.5) * 3.0 * Pi)};
-      const double    near   = std::ldexp(radius, -static_cast<int>(mixer.Pick(30)) - 8);
+      const double near   = std::ldexp(radius, -static_cast<int>(mixer.Pick(30)) - 8);
       const Tolerance tolerance = {.Length = near, .Radians = 1e-9};
       const Curve     one       = first;
       const Curve     two       = second;
@@ -1296,11 +1336,12 @@ namespace Geoxy
     const int rounds = Rounds(40000);
     for (int round = 0; round < rounds; ++round)
     {
-      const double away  = std::ldexp(mixer.Unit(), static_cast<int>(mixer.Pick(28)));
-      const double size  = std::ldexp(1.0, static_cast<int>(mixer.Pick(12)) - 4);
-      const double near  = std::ldexp(size, -static_cast<int>(mixer.Pick(30)) - 6);
-      const Point  base  = {.X = away, .Y = -away};
-      const auto   drawn = [&mixer, size](Point about) -> Curve
+      const double awayFraction = mixer.Unit();
+      const double away         = std::ldexp(awayFraction, static_cast<int>(mixer.Pick(28)));
+      const double size         = std::ldexp(1.0, static_cast<int>(mixer.Pick(12)) - 4);
+      const double near         = std::ldexp(size, -static_cast<int>(mixer.Pick(30)) - 6);
+      const Point  base         = {.X = away, .Y = -away};
+      const auto   drawn        = [&mixer, size](Point about) -> Curve
       {
         if (mixer.Pick(2) == 0)
         {
@@ -1432,10 +1473,11 @@ namespace Geoxy
     int sided = 0;
     for (int round = 0; round < rounds; ++round)
     {
-      const double away  = std::ldexp(mixer.Unit(), static_cast<int>(mixer.Pick(28)));
-      const double size  = std::ldexp(1.0, static_cast<int>(mixer.Pick(12)) - 4);
-      const double near  = std::ldexp(size, -static_cast<int>(mixer.Pick(30)) - 6);
-      const Point  base  = {.X = away, .Y = -away};
+      const double awayFraction = mixer.Unit();
+      const double away         = std::ldexp(awayFraction, static_cast<int>(mixer.Pick(28)));
+      const double size         = std::ldexp(1.0, static_cast<int>(mixer.Pick(12)) - 4);
+      const double near         = std::ldexp(size, -static_cast<int>(mixer.Pick(30)) - 6);
+      const Point  base         = {.X = away, .Y = -away};
       const Line   first = {.Start = base + (Vector{.X = mixer.Unit(), .Y = mixer.Unit()} * size),
                             .End   = base + (Vector{.X = mixer.Unit(), .Y = mixer.Unit()} * size)};
       const Vector way   = first.End - first.Start;
@@ -1518,11 +1560,12 @@ namespace Geoxy
     const int rounds = Rounds(5000);
     for (int round = 0; round < rounds; ++round)
     {
-      const double away = std::ldexp(mixer.Unit(), static_cast<int>(mixer.Pick(24)));
-      const double size = std::ldexp(1.0, static_cast<int>(mixer.Pick(8)) - 2);
-      const double near = std::ldexp(size, -static_cast<int>(mixer.Pick(20)) - 10);
-      const Point  base = {.X = away, .Y = -away};
-      const auto   spot = [&mixer, size](Point about) -> Point
+      const double awayFraction = mixer.Unit();
+      const double away         = std::ldexp(awayFraction, static_cast<int>(mixer.Pick(24)));
+      const double size         = std::ldexp(1.0, static_cast<int>(mixer.Pick(8)) - 2);
+      const double near         = std::ldexp(size, -static_cast<int>(mixer.Pick(20)) - 10);
+      const Point  base         = {.X = away, .Y = -away};
+      const auto   spot         = [&mixer, size](Point about) -> Point
       {
         return about + (Vector{.X = mixer.Unit(), .Y = mixer.Unit()} * size);
       };
@@ -1572,12 +1615,15 @@ namespace Geoxy
         case 2:
           return strung(about);
         case 3:
-          return Ellipse{.Map   = Translation(spot(about) - Point{})
-                                * Rotation(Degrees(180.0 * mixer.Unit()))
-                                * Scaling(size * (0.1 + std::abs(mixer.Unit())),
-                                          size * (0.05 + (0.5 * std::abs(mixer.Unit())))),
+        {
+          const Matrix moved  = Translation(spot(about) - Point{});
+          const Matrix turned = Rotation(Degrees(180.0 * mixer.Unit()));
+          const double wide   = size * (0.1 + std::abs(mixer.Unit()));
+          const double high   = size * (0.05 + (0.5 * std::abs(mixer.Unit())));
+          return Ellipse{.Map   = moved * turned * Scaling(wide, high),
                          .Start = Degrees(180.0 * mixer.Unit()),
                          .Sweep = mixer.Pick(3) == 0 ? Turn : Degrees(350.0 * mixer.Unit())};
+        }
         case 4:
           return splined(about);
         default:
